@@ -91,13 +91,16 @@ if (! class_exists('Genesis_Club_Utils')) {
             return $result;
         }
 
-        function update_meta( $type = 'post', $id = false, $metakey, $vals, $defaults = false)
+        function update_meta($metakey, $vals, $type = 'post', $id = false)
         {
-            if (!$defaults) { $defaults = array();
+            if (!$defaults) {
+                $defaults = array();
             }
             if (is_array($vals)) {
-                foreach ($vals as $k => $v) { if (!is_array($v)) { $vals[$k] = stripslashes(trim($v));
-                }
+                foreach ($vals as $k => $v) {
+                    if (!is_array($v)) {
+                        $vals[$k] = stripslashes(trim($v));
+                    }
                 }
                 $vals = @serialize(wp_parse_args($vals, $defaults));
             } else {
@@ -114,6 +117,7 @@ if (! class_exists('Genesis_Club_Utils')) {
                 return $this->update_user_meta($id, $metakey, $vals); break;
             }
         }
+
 
         function get_home_meta( $key = false, $result = array() )
         {
@@ -328,12 +332,13 @@ if (! class_exists('Genesis_Club_Utils')) {
             return sprintf('<select id="%1$s" name="%2$s"%4$s>%3$s</select>', $fld_id, $fld_name, $input, $multiple ? ' multiple':'');
         }
 
-        function form_field($fld_id, $fld_name, $label, $value, $type, $options = array(), $args = array(), $wrap = false)
+        function form_field($fld_id, $fld_name, $label, $value, $type, $wrap = false, $options = array(), $args = array())
         {
             if ($args) { extract($args);
             }
             $input = '';
             $label = sprintf('<label class="diy-label" for="%1$s">%2$s</label>', $fld_id, __($label));
+
             switch ($type) {
             case 'number':
             case 'password':
@@ -372,7 +377,7 @@ if (! class_exists('Genesis_Club_Utils')) {
             case 'checkbox':
                 if (is_array($options) && (count($options) > 0)) {
                     if (isset($legend)) {
-                                  $input .= sprintf('<legend class="screen-reader-text"><span>%1$s</span></legend>', $legend);
+                          $input .= sprintf('<legend class="screen-reader-text"><span>%1$s</span></legend>', $legend);
                     }
                     if (!isset($separator)) { $separator = '';
                     }
@@ -409,7 +414,7 @@ if (! class_exists('Genesis_Club_Utils')) {
             case 'radio':
                 if (is_array($options) && (count($options) > 0)) {
                     if (isset($legend)) {
-                                  $input .= sprintf('<legend class="screen-reader-text"><span>%1$s</span></legend>', $legend);
+                          $input .= sprintf('<legend class="screen-reader-text"><span>%1$s</span></legend>', $legend);
                     }
                     if (!isset($separator)) { $separator = '';
                     }
