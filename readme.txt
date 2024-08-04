@@ -52,7 +52,23 @@ DASHBOARD MODULE:
 * Validated PHP 7 compatibility.
 * Updated for WordPress 4.8 and Genesis 2.5.2.
 
-[...]
+= 1.16.1 =
+*  Fix fatal error in Thesis migration module
+
+= 1.16 =
+* Enhancements to Genesis Club Posts Widget (posts per  row, custom classes for excerpts and read more links)
+* Integration with The SEO Framework plugin to set the Facebook OpenGraph title, description and image (and override the default values of post title, description and featured image)
+* Add support forFacebook opengraph tags to the SEO migration module
+* Relocate the various Facebook features from the Display Module into the Social Module
+* Add option to show uparrow/downarrow open/close indicators to the accordion FAQs
+* Add setting to hide top bar on home page
+* Add setting to show top bar only on the home page
+* Add background color and opacity options to WordPress login page
+* Remove logo from Pinterest sharing
+* Single click to add screen reader text support for older Genesis child themes
+* Updated for WordPress 4.5.2
+
+For full plugin history please see http://www.diywebmastery.com/plugins/genesis-club-lite/changelog
 
 == Upgrade Notice ==
 
