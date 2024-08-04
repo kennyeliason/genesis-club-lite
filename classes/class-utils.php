@@ -79,13 +79,13 @@ if (! class_exists('Genesis_Club_Utils')) {
         function get_meta($type, $id, $key = false, $result= false)
         {
             switch ($type) {
-            case 'home': 
+            case 'home':
                 return $this->get_home_meta($key, $result); break;
-            case 'post': 
+            case 'post':
                 return $this->get_post_meta($id, $key, $result); break;
-            case 'term': 
+            case 'term':
                 return $this->get_term_meta($id, $key, true, $result); break;
-            case 'user': 
+            case 'user':
                 return $this->get_user_meta($id, $key, true, $result); break;
             }
             return $result;
@@ -104,13 +104,13 @@ if (! class_exists('Genesis_Club_Utils')) {
                 $vals = stripslashes(trim($vals));
             }
             switch ($type) {
-            case 'home': 
+            case 'home':
                 return $this->update_home_meta($metakey, $vals); break;
-            case 'post': 
+            case 'post':
                 return $this->update_post_meta($id, $metakey, $vals); break;
-            case 'term': 
+            case 'term':
                 return $this->update_term_meta($id, $metakey, $vals); break;
-            case 'user': 
+            case 'user':
                 return $this->update_user_meta($id, $metakey, $vals); break;
             }
         }
@@ -122,7 +122,7 @@ if (! class_exists('Genesis_Club_Utils')) {
                     return isset($meta[$key]) ? (is_serialized($meta[$key]) ? @unserialize($meta[$key]) : $meta[$key]) : $result;
                 } else {
                     return $meta;
-                } 
+                }
             } else {
                 return $result;
             }
@@ -249,7 +249,7 @@ if (! class_exists('Genesis_Club_Utils')) {
                     return strpos($wp_query->post->post_content, $attribute) !== false ;
                 } else {
                     return true;
-                } 
+                }
             } else {
                 return false;
             }
@@ -431,16 +431,16 @@ if (! class_exists('Genesis_Club_Utils')) {
                 }
                 $input = wp_dropdown_pages($args);
                 break;
-            case 'hidden': 
+            case 'hidden':
                 return sprintf('<input type="hidden" name="%1$s" value="%2$s" />', $fld_name, $value);
             default: $input = $value;
             }
             if (!$wrap) { $wrap = 'div';
             }
             switch ($wrap) {
-            case 'tr': $format = '<tr class="diy-row"><th scope="row">%1$s</th><td>%2$s</td></tr>'; 
+            case 'tr': $format = '<tr class="diy-row"><th scope="row">%1$s</th><td>%2$s</td></tr>';
                 break;
-            case 'br': $format = 'checkbox'==$type ? '%2$s%1$s<br/>' : '%1$s%2$s<br/>'; 
+            case 'br': $format = 'checkbox'==$type ? '%2$s%1$s<br/>' : '%1$s%2$s<br/>';
                 break;
             default: $format = strpos($input, 'fieldset') !== false ?
                 '<div class="diy-row wrapfieldset">%1$s%2$s</div>' : ('<'.$wrap.' class="diy-row">%1$s%2$s</'.$wrap.'>');
