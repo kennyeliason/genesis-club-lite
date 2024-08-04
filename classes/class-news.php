@@ -22,12 +22,13 @@ if (!class_exists('Genesis_Club_News')) {
                 self::HANDLE, self::SCRIPT_VAR,
                 array(
                 'ajaxurl' => admin_url('admin-ajax.php'),
-                'ajaxnonce'   => wp_create_nonce(self::SCRIPT_VAR.'_nonce'),
-                'ajaxaction'   => self::SCRIPT_VAR,
-                'ajaxresults'  => '.'.self::RESULTS
+                'ajaxnonce' => wp_create_nonce(self::SCRIPT_VAR.'_nonce'),
+                'ajaxaction' => self::SCRIPT_VAR,
+                'ajaxresults' => '.'.self::RESULTS
                 )
             );
         }
+
 
         function get_feeds_ajax()
         {
@@ -164,10 +165,11 @@ if (!class_exists('Genesis_Club_News')) {
         {
             if (is_array($feeds) && (count($feeds) > 0)) {
                 printf('<div class="%1$s"></div>', self::RESULTS);
-                for($index=0; $index < count($feeds); $index++ ) {
-                       wp_localize_script(self::HANDLE, self::SCRIPT_VAR.$index, array( 'feedurl' => $feeds[$index]));
+                foreach ($feeds as $index => $feed) {
+                    wp_localize_script(self::HANDLE, self::SCRIPT_VAR.$index, array( 'feedurl' => $feed));
                 }
             }
         }
+
     }
 }
