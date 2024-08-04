@@ -11,7 +11,12 @@
    padding-bottom: 0;
 }
 
+#normal-sortables .postbox {
+    border-top: 0;
+}
+
 #poststuff .nav-tab.nav-tab-active, #poststuff .nav-tab:hover  {
-    background-color: #fff;
+    background-color: #FFF;
+    border-bottom-color: #FFF;
 }
 

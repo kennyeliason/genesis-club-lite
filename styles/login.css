@@ -1,17 +1,22 @@
 html {background: #FFF9EC !important;}
-body, body.login {margin:0 auto 0 auto; border-top-width: 0px;
+body, body.login {
+   background-image: url(images/login-background.jpg); 
   background-repeat: no-repeat; 
   background-size: cover;
-  background-image: url(images/login-background.jpg); }
-
-#logo { background-repeat: no-repeat; 
-  background-image: url(images/login-logo.png); 
-  background-position: center bottom; 
-  background-size:200px auto;
+   border-top-width: 0px;
+   margin:0 auto 0 auto; 
 }
 
-#login { max-width: 560px; min-height:750px; padding-top: 10px;}
-#login h1 a { width: 100%; text-align: left; height:160px;}
+#login h1 a { 
+   background-repeat: no-repeat; 
+  background-image: url(images/login-logo.png); 
+  background-position: center bottom; 
+   background-size: contain; 
+   height:120px;
+   width: 100%; 
+   text-align: left; 
+}
+
 #login form input {font-family:inherit;}
 #login form label {color:#fff;cursor:pointer;font-weight:700;text-shadow:none;}
 
@@ -39,8 +44,17 @@ body, body.login {margin:0 auto 0 auto; border-top-width: 0px;
 #login form .submit input,#login form .submit input:active {
  border-radius:5px;
  background-color:#7EA74D;
- color:#fff!important;
- cursor:pointer;font-family:inherit;font-size:16px;height:36px;width:120px;border:none;
+ color:#fff;
+ text-shadow:none;
+ box-shadow:none;
+ -webkit-box-shadow: none;
+ border-color: transparent;
+ cursor:pointer;
+ font-family:inherit;
+ font-size:16px;
+ height:36px;
+ min-width:120px;
+ border:none;
  margin-top: 15px;
  margin-bottom:0px;
  clear:both;
@@ -63,3 +77,9 @@ p#backtoblog { display: none;}
 #form-opt {margin:0 1.5em;}
 .form-buttons {text-align:right;}
 .error p {background:#8A1F11;color:#fff;padding:1em;}
+
+#login { max-width: 560px; min-height:750px; padding-top: 80px;}
+
+@media screen and (max-width: 800px) {
+    #login { min-height:auto; padding-top: 10px;}
+}

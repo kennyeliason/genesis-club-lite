@@ -2,6 +2,12 @@
 class Genesis_Club_Bar_Admin extends Genesis_Club_Admin {
     const TOGGLE_BAR = 'genesis_club_toggle_bar';
 
+   private $bar;
+   
+	private $archive_tips = array(
+	   Genesis_Club_Bar::HIDE_BAR_METAKEY => array('heading' => 'Hide the top bar', 'tip' => 'Click to hide the top bar on this archive'),
+	   Genesis_Club_Bar::SHOW_BAR_METAKEY => array('heading' => 'Show the top bar', 'tip' => 'Click to show the top bar on this archive'));
+   
 	private $tips = array(
 			'bar_title' => array('heading' => 'Title', 'tip' => 'Only displayed on admin site for labelling purposes'),
 			'bar_enabled' => array('heading' => 'Enable Default Bar', 'tip' => 'Click to enable this Top Bar on the home page, archives, posts, etc. If not enabled then any settings below are ignored and top bar widgets will be displayed'),
@@ -18,10 +24,16 @@ class Genesis_Club_Bar_Admin extends Genesis_Club_Admin {
 			'bar_opener' => array('heading' => 'Opener Tab', 'tip' => 'Here you can choose have a Tab/Button on the right hand side on the bar that can be used to open the bar. This also adds a button on the bar to close it.'),
 			'bar_location' => array('heading' => 'HTML Element', 'tip' => 'Leave the default setting of body unless your theme has a fixed header in which case enter the fixed element to which you want to attach the bar.'),
 			'bar_position' => array('heading' => 'Position', 'tip' => 'Locate the bar at the top or the bottom of your chosen element.'),
+			'bar_hide_on_home' => array('heading' => 'Hide On Home', 'tip' => 'Do not show the default top bar on the home page.'),
+			'bar_show_only_on_home' => array('heading' => 'Show Only On Home', 'tip' => 'Show the default top bar only on the home page.'),
 			);
 
 	function init() {
+	   $this->bar = $this->plugin->get_module('bar');
 		add_action('admin_menu',array($this, 'admin_menu'));
+		add_action('load-edit-tags.php', array($this, 'load_archive_page'));	
+        add_action('load-term.php', array($this, 'load_archive_page'));	
+		add_action('edit_term', array($this, 'save_archive'), 10, 2 );			
 		add_action('genesis_club_hiding_settings_save', array($this, 'save_page_visibility'), 10, 1);
 		add_filter('genesis_club_hiding_settings_show', array($this, 'add_page_visibility'), 10, 2);
 	}
@@ -39,31 +51,37 @@ class Genesis_Club_Bar_Admin extends Genesis_Club_Admin {
 
 	function load_page() {
  		if (isset($_POST['options_update'])) $this->save_bar();	
-		$callback_params = array ('options' =>  Genesis_Club_Bar::get_options());
+		$callback_params = array ('options' =>  $this->bar->get_options());
 		$this->add_meta_box('bar', 'Top Bar',  'intro_panel', $callback_params);
 		$this->add_meta_box('defaults', 'Defaults',  'defaults_panel', $callback_params);
-		$this->add_meta_box('news', 'Genesis Club News', 'news_panel',$callback_params, 'advanced');
+		$this->add_meta_box('news', 'Genesis Club News', 'news_panel',null, 'advanced');
 		$this->set_tooltips($this->tips);
 		add_action('admin_enqueue_scripts',array($this, 'enqueue_admin_styles'));
 		add_action('admin_enqueue_scripts',array($this, 'enqueue_metabox_scripts'));
 		add_action('admin_enqueue_scripts',array($this, 'enqueue_postbox_scripts'));
 	}
 
-	function do_meta_boxes( $post_type, $context) {
-		$post_types=get_post_types();
-		if ( in_array($post_type, $post_types ) && ('advanced' === $context )) {
-			add_meta_box( 'genesis-club-bar-visibility', 'Top Bar Control Settings', array( $this, 'bar_visibility_panel' ), $post_type, 'advanced', 'low' );
-		}
+ 	function load_archive_page() {
+        if (isset($_GET['post_type']) && $this->plugin->is_post_type_enabled($_GET['post_type'])) {
+            $this->set_tooltips($this->archive_tips);
+            add_action( Genesis_Club_Dashboard::ARCHIVE_HOOK_ID, array($this, 'add_archive_panel'), 10, 3 );	
+        }
 	}
 
-	function save_postmeta($post_id) {
-		if (array_key_exists('genesis_club_toggle_bar', $_POST)) {
-			$key = 'hide'==$_POST['genesis_club_toggle_bar'] ? Genesis_Club_Bar::HIDE_BAR_METAKEY : Genesis_Club_Bar::SHOW_BAR_METAKEY;	
-			$val = array_key_exists($key, $_POST) ? $_POST[$key] : false;
-			update_post_meta( $post_id, $key, $val );
-		}	
-	}
+	function save_archive($term_id, $tt_id) {
+        $key = $this->bar->get_toggle_termmeta_key();
+		return isset( $_POST['genesis_club_archive_bar'] )  ?
+			$this->utils->update_term_meta( $term_id, $key, isset($_POST[$key])) : false;
+	}	
 
+	function add_archive_panel($content, $term, $slug) {
+		$key = $this->bar->get_toggle_termmeta_key();
+        $value = $this->utils->get_term_meta($term->term_id, $key, false);
+        return $content + array(
+            'Bar' => sprintf('<table class="form-table">%1$s</table><p class="meta-options"><input type="hidden" name="genesis_club_archive_bar" value="1" /></p>', 
+                 $this->form_field($key, $key, $this->get_tip($key), $value,  'checkbox', array(), array(), 'tr'))) ;
+    }	
+   
 	function esc_html_field($field_name) {
 		if (array_key_exists($field_name, $_POST))
 			$_POST[$field_name] = esc_html(trim(stripslashes($_POST[$field_name])));
@@ -79,7 +97,7 @@ class Genesis_Club_Bar_Admin extends Genesis_Club_Admin {
 	function save_bar() {
 		check_admin_referer(__CLASS__);
 		$this->sanitise_bar();
-		return $this->save_options('Genesis_Club_Bar', 'Bar', 4);
+		return $this->save_options($this->bar, 'Bar', 4);
 	}
 
     function bar_on_posts($post_type) {
@@ -92,7 +110,7 @@ class Genesis_Club_Bar_Admin extends Genesis_Club_Admin {
 
 	function fetch_page_visibility($post) {
 		$key = self::TOGGLE_BAR;	
-		$meta_key = Genesis_Club_Bar::get_toggle_meta_key($post->post_type);
+		$meta_key = $this->bar->get_toggle_postmeta_key($post->post_type);
 		return $this->form_field($key, $key, 
 			__(strpos($meta_key, 'hide') !== FALSE ? 'Do not show the top bar on this page' : 'Show the top bar on this page'), 
 			get_post_meta($post->ID, $meta_key, true),  'checkbox', array(), array(), 'br') ;
@@ -101,7 +119,7 @@ class Genesis_Club_Bar_Admin extends Genesis_Club_Admin {
 	function save_page_visibility($post_id) {
 		$key = self::TOGGLE_BAR;
 		$post_type = get_post_type( $post_id);
-		$meta_key = Genesis_Club_Bar::get_toggle_meta_key($post_type);	
+		$meta_key = $this->bar->get_toggle_postmeta_key($post_type);	
 		update_post_meta( $post_id, $meta_key, array_key_exists($key, $_POST) ? $_POST[$key] : false);
 	}
 
@@ -125,8 +143,8 @@ BAR_VISIBILITY;
 		print <<< INTRO
 <p>The top bar is a responsive bar that allows you add a message at the top of each page: you can display different messages on different devices. For example, you
 can specify a click to call button on mobile devices.<p>
-<p>Below you can set the default bar settings. Use this feature if you want to have the same message content in the top bar on most of the pages on the site.</p>
-<p>You can use the <em>Genesis Club Hiding Settings</em> in the Page Editor to suppress the top bar on pages where you do not want it to appear.</p>
+<p>Below you can set the default bar settings. Use this feature if you want to have the same message content in the top bar on most of the pages on the site. The default top bar is shown on the home page, on archive pages, on posts but not on pages or custom posts types by default. You can use the <em>Genesis Club Post Settings</em> in the Page Editor to  override this on a page by page basis.</p>
+<p>With Genesis Club Pro you can use Genesis Club Top Bar widgets to override the top bar with a different message. We recommend you use a plugin such as Widget Logic to control which widgets appear on which pages.</p>
 INTRO;
 		print $this->fetch_form_field('bar_enabled',$options['enabled'], 'checkbox');
 	}
@@ -134,7 +152,7 @@ INTRO;
  
  	function defaults_panel($post,$metabox) {
 		$options = $metabox['args']['options'];
-      $this->display_metabox( array(
+      print $this->tabbed_metabox( $metabox['id'], array(
          'Messages' => $this->messages_panel($options),
          'Colors' => $this->colors_panel($options),
          'Timings' => $this->timings_panel($options),
@@ -145,16 +163,16 @@ INTRO;
 
 	function messages_panel($options){	
       return
-         $this->fetch_text_field('bar_full_message',$options['full_message'], array('size' => 55)).
-         $this->fetch_text_field('bar_laptop_message',$options['laptop_message'],  array('size' => 50)).
-         $this->fetch_text_field('bar_tablet_message',$options['tablet_message'], array('size' => 45)).
-         $this->fetch_text_field('bar_short_message',$options['short_message'], array('size' => 40));
+         $this->fetch_text_field('bar_full_message',$options['full_message'], array('class' => 'large-text')).
+         $this->fetch_text_field('bar_laptop_message',$options['laptop_message'],  array('class' => 'large-text')).
+         $this->fetch_text_field('bar_tablet_message',$options['tablet_message'], array('class' => 'large-text')).
+         $this->fetch_text_field('bar_short_message',$options['short_message'], array('class' => 'large-text'));
 	}
 
 	function colors_panel($options){	
 		return
          $this->fetch_text_field('bar_font_color',$options['font_color'], array('size' => 8, 'class' => 'color-picker')).
-         $this->fetch_text_field('bar_background',$options['background'], array('size' => 50));
+         $this->fetch_text_field('bar_background',$options['background'], array('class' => 'large-text'));
 	}
 
 	function timings_panel($options){	
@@ -173,7 +191,9 @@ INTRO;
 	function location_panel($options){	
 		return
          $this->fetch_text_field('bar_location',$options['location'], array('size' => 20)).
-         $this->fetch_form_field('bar_position',$options['position'], 'radio', array('top' => 'Top', 'bottom' => 'Bottom'));
+         $this->fetch_form_field('bar_position',$options['position'], 'radio', array('top' => 'Top', 'bottom' => 'Bottom')).
+         $this->fetch_form_field('bar_hide_on_home',$options['hide_on_home'], 'checkbox').
+         $this->fetch_form_field('bar_show_only_on_home',$options['show_only_on_home'], 'checkbox');
 	}
 
 }

@@ -2,15 +2,32 @@
 if (! class_exists('Genesis_Club_Utils')) {
   class Genesis_Club_Utils {
 
-	static protected $is_html5 = null;
+    const HOME_META_KEY = '_genesis_club_home_meta';
+    const POST_META_KEY = '_genesis_club_post_meta';
+    const TERM_META_KEY = '_genesis_club_term_meta';        
 
-	static function is_html5() {
-		if (self::$is_html5 == null)
-			self::$is_html5 = function_exists('current_theme_supports') && current_theme_supports('html5');		
-		return self::$is_html5;
+    protected $prefix = 'genesis_club';
+	protected $is_html5 = null;
+
+    function get_prefix() {
+        return $this->prefix;
+    }
+
+	function is_html5() {
+		if ($this->is_html5 == null)
+			$this->is_html5 = function_exists('current_theme_supports') && current_theme_supports('html5');		
+		return $this->is_html5;
 	}
 
-   static function get_current_term() {
+    function is_yoast_installed() {
+        return defined('WPSEO_VERSION');
+    }
+         
+    function is_seo_framework_installed() {
+        return defined('THE_SEO_FRAMEWORK_VERSION');
+    }
+
+   function get_current_term() {
 		if (is_tax() || is_category() || is_tag()) {
 			if (is_category())
 				$term = get_term_by('slug',get_query_var('category_name'),'category') ;
@@ -28,7 +45,14 @@ if (! class_exists('Genesis_Club_Utils')) {
       return $term; 
 	}
 
-	static function get_post_id() {
+    function get_term_id() {
+        if (is_archive() && ($term = $this->get_current_term()))
+            return $term->term_id;
+        else
+            return false;
+    }
+
+	function get_post_id() {
 		global $post;
 
 		if (is_object($post) 
@@ -39,7 +63,125 @@ if (! class_exists('Genesis_Club_Utils')) {
 			return false;
 	}
 
-	static function post_has_shortcode($shortcode, $attribute = false) {
+    function get_meta($type, $id, $key = false, $result= false) {
+        switch ($type) {
+            case 'home': return $this->get_home_meta($key, $result); break;
+            case 'post': return $this->get_post_meta($id, $key, $result); break;
+            case 'term': return $this->get_term_meta($id, $key, true, $result); break;
+            case 'user': return $this->get_user_meta($id, $key, true, $result); break;
+        }
+        return $result;
+    }
+
+	function update_meta( $type = 'post', $id = false, $metakey, $vals, $defaults = false) {
+        if (!$defaults) $defaults = array();	
+        if (is_array($vals)) {
+            foreach ($vals as $k => $v) if (!is_array($v)) $vals[$k] = stripslashes(trim($v));
+            $vals = @serialize(wp_parse_args($vals, $defaults));
+        } else {
+            $vals = stripslashes(trim($vals));
+        }
+		switch ($type) { 
+		  case 'home': return $this->update_home_meta( $metakey, $vals ); break;
+          case 'post': return $this->update_post_meta( $id, $metakey, $vals ); break;		
+		  case 'term': return $this->update_term_meta( $id, $metakey, $vals ); break;
+          case 'user': return $this->update_user_meta( $id, $metakey, $vals ); break;	
+        }
+	}
+
+    function get_home_meta( $key = false, $result = array() ) {
+        if ($meta = get_option(self::HOME_META_KEY))
+            if ($key && ($key != self::HOME_META_KEY))
+                return isset($meta[$key]) ? (is_serialized($meta[$key]) ? @unserialize($meta[$key]) : $meta[$key]) : $result;
+            else
+                return $meta;
+		else
+            return $result;
+	}
+
+    function update_home_meta( $key, $vals) {
+        $meta = self::get_home_meta();
+        if ($key && ($key != self::HOME_META_KEY))
+            $meta[$key] = $vals;
+        else
+            $meta = $vals;
+        update_option(self::HOME_META_KEY, $meta);
+    }
+
+
+	function get_post_meta ($post_id, $key= false, $result = false) {
+        if (!$key) $key = self::POST_META_KEY;
+		if ($post_id && $key
+		&& ($meta = get_post_meta($post_id, $key, true))
+		&& ($options = (is_serialized($meta) ? @unserialize($meta) : $meta))
+		&& (is_array($options) || is_string($options)))
+			return $options;
+		else
+			return $result;
+	}
+
+	function get_post_meta_value($post_id, $key) {
+        return get_post_meta($post_id, $key, true);
+	}
+
+    function update_post_meta( $post_id, $key = false, $values = false) {
+        if (!$key) $key = self::POST_META_KEY;
+        return update_post_meta( $post_id, $key, $values);
+    }
+
+    function get_term_meta( $term_id, $key= false, $result = false ) {
+        if (function_exists('get_term_meta')) {
+            if (!$key) $key = self::TERM_META_KEY;
+            if ($vals = get_term_meta( $term_id, $key, true)) return $vals;            
+        } else {
+             $meta = get_option(self::TERM_META_KEY);           
+             if (!$meta) return $result; 
+             if ($key && ($key != self::TERM_META_KEY) ) { 
+                if (isset($meta[$term_id][$key])) return $meta[$term_id][$key];
+             } else {
+                if (isset($meta[$term_id])) return $meta[$term_id];                
+             }
+        }   
+        return $result;
+    }
+
+    function update_term_meta( $term_id, $key = false, $values = false) {
+
+        if (function_exists('update_term_meta')) {
+            if (!$key) $key = self::TERM_META_KEY;            
+            return update_term_meta( $term_id, $key, $values);
+        } else {
+            $meta = get_option(self::TERM_META_KEY);
+            if (!$meta) $meta = array(); 
+            if ($key && ($key != self::TERM_META_KEY))               
+                $meta[$term_id][$key] = $values;
+            else
+                $meta[$term_id] = $values;               
+            update_option(self::TERM_META_KEY, $meta);
+        }
+    }
+
+	function get_user_meta ($user_id, $key= false, $result = false) {
+        if (!$key) $key = self::USER_META_KEY;
+		if ($user_id && $key
+		&& ($meta = get_user_meta($user_id, $key, true))
+		&& ($options = (is_serialized($meta) ? @unserialize($meta) : $meta))
+		&& (is_array($options) || is_string($options)))
+			return $options;
+		else
+			return $result;
+	}
+
+    function update_user_meta( $user_id, $key = false, $values = false) {
+        if (!$key) $key = self::USER_META_KEY;
+        return update_user_meta( $user_id, $key, $values);
+    }
+
+	function get_toggle_post_meta_key($action,  $item) {
+		return sprintf('_%1$s_%2$s_%3$s', $this->prefix, $action, $item );
+	}
+
+	function post_has_shortcode($shortcode, $attribute = false) {
 		global $wp_query;
 		if (isset($wp_query)
 		&& isset($wp_query->post)
@@ -54,17 +196,13 @@ if (! class_exists('Genesis_Club_Utils')) {
 			return false;
 	}
 
-	static function get_meta ($post_id, $key) {
-		if ($post_id && $key
-		&& ($meta = get_post_meta($post_id, $key, true))
-		&& ($options = (is_serialized($meta) ? @unserialize($meta) : $meta))
-		&& (is_array($options) || is_string($options)))
-			return $options;
-		else
-			return false;
-	}
+    function clean_css_classes($classes) {
+        $classes = str_replace(array('{', '}', '[', ']', '(', ')'), '', $classes);
+        $classes = str_replace(array(',', ';', ':'), ' ', $classes);
+        return trim($classes);
+    }
 
-	static function json_encode($params) {
+	function json_encode($params) {
    		//fix numerics and booleans
 		$pat = '/(\")([0-9]+)(\")/';	
 		$rep = '\\2';
@@ -72,14 +210,15 @@ if (! class_exists('Genesis_Club_Utils')) {
 			preg_replace($pat, $rep, json_encode($params)));
 	} 
    
-	static function is_mobile_device() {
+	function is_mobile_device() {
 		return  preg_match("/wap.|.wap/i", $_SERVER["HTTP_ACCEPT"])
-    		|| preg_match("/iphone|ipad/i", $_SERVER["HTTP_USER_AGENT"]);
+    		|| preg_match("/iphone|ipad/i", $_SERVER["HTTP_USER_AGENT"])
+    		|| preg_match("/android/i", $_SERVER["HTTP_USER_AGENT"]);
 	} 
 
-	static function is_landing_page($page_template='') {	
+	function is_landing_page($page_template='') {	
 		if (empty($page_template)
-		&& ($post_id = self::get_post_id()))
+		&& ($post_id = $this->get_post_id()))
 			$page_template = get_post_meta($post_id,'_wp_page_template',TRUE);
 		
 		if (empty($page_template)) return false;
@@ -88,24 +227,21 @@ if (! class_exists('Genesis_Club_Utils')) {
 		return in_array($page_template, $landing_pages );
 	}
 
-	static function hide_widget($visibility ) {
-		$hide = false;
-		$is_landing = self::is_landing_page();
-		switch ($visibility) {
-			case 'hide_landing' : $hide = $is_landing; break; //hide only on landing pages
-			case 'show_landing' : $hide = ! $is_landing; break; //hide except on landing pages
-		}
-		return $hide;
+	function read_more_link($link_text='Read More', $class='', $prefix = '') {
+ 		$classes = empty($class) ? '' : (' ' . $class);
+ 		return sprintf('%1$s<a class="more-link%2$s" href="%3$s">%4$s</a>', $prefix, $classes, get_permalink(), $link_text);
+ 	}
+
+	function register_tooltip_styles() {
+		wp_register_style('diy-tooltip', plugins_url('styles/tooltip.css',dirname(__FILE__)), array(), null); 
 	}
 	
-    static function get_visibility_options(){
-		return array(
-			'' => 'Show on all pages', 
-			'hide_landing' => 'Hide on landing pages', 
-			'show_landing' => 'Show only on landing pages');
+	function enqueue_tooltip_styles() {
+         wp_enqueue_style('diy-tooltip');
+         wp_enqueue_style('dashicons');
 	}
 
-	static function selector($fld_id, $fld_name, $value, $options, $multiple = false) {
+	function selector($fld_id, $fld_name, $value, $options, $multiple = false) {
 		$input = '';
 		if (is_array($options)) {
 			foreach ($options as $optkey => $optlabel)
@@ -117,21 +253,23 @@ if (! class_exists('Genesis_Club_Utils')) {
 		return sprintf('<select id="%1$s" name="%2$s"%4$s>%3$s</select>', $fld_id, $fld_name, $input, $multiple ? ' multiple':'');							
 	}
 
-	static function form_field($fld_id, $fld_name, $label, $value, $type, $options = array(), $args = array(), $wrap = false) {
+	function form_field($fld_id, $fld_name, $label, $value, $type, $options = array(), $args = array(), $wrap = false) {
 		if ($args) extract($args);
 		$input = '';
 		$label = sprintf('<label class="diy-label" for="%1$s">%2$s</label>', $fld_id, __($label));
 		switch ($type) {
-			case 'text':
+			case 'number':
 			case 'password':
-				$input .= sprintf('<input type="%9$s" id="%1$s" name="%2$s" value="%3$s" %4$s%5$s%6$s%7$s /> %8$s',
-					$fld_id, $fld_name, $value, 
+			case 'text':
+				$input .= sprintf('<input type="%1$s" id="%2$s" name="%3$s" value="%4$s" %5$s%6$s%7$s%8$s%9$s%10$s /> %11$s',
+					$type, $fld_id, $fld_name, $value, 
 					isset($readonly) ? (' readonly="'.$readonly.'"') : '',
 					isset($size) ? (' size="'.$size.'"') : '', 
 					isset($maxlength) ? (' maxlength="'.$maxlength.'"') : '',
 					isset($class) ? (' class="'.$class.'"') : '', 
-					isset($suffix) ? $suffix : '', 
-					$type);
+					isset($min) ? (' min="'.$min.'"') : '', 
+					isset($max) ? (' max="'.$max.'"') : '', 
+					isset($suffix) ? $suffix : '');
 				break;
 			case 'file':
 				$input .= sprintf('<input type="file" id="%1$s" name="%2$s" value="%3$s" %4$s%5$s%6$s accept="image/*" />',
@@ -146,7 +284,7 @@ if (! class_exists('Genesis_Club_Utils')) {
 					isset($readonly) ? (' readonly="'.$readonly.'"') : '', 
 					isset($rows) ? (' rows="'.$rows.'"') : '', 
 					isset($cols) ? (' cols="'.$cols.'"') : '',
-					isset($class) ? (' class="'.$class.'"') : '', stripslashes($value));
+					isset($class) ? (' class="'.$class.'"') : '', $value);
 				break;
 			case 'checkbox':
 				if (is_array($options) && (count($options) > 0)) {
@@ -186,8 +324,13 @@ if (! class_exists('Genesis_Club_Utils')) {
 				}
 				break;		
 			case 'select': 
-				$input =  self::selector($fld_id, $fld_name, $value, $options, isset($multiple));							
+				$input =  $this->selector($fld_id, $fld_name, $value, $options, isset($multiple));							
 				break;	
+            case 'page':
+                $args = array( 'id' => $fld_name, 'name' => $fld_name, 'selected' => $value, 'echo' => false,  'depth' => 0, 'option_none_value' => 0);
+                if (isset($show_option_none)) $args['show_option_none'] = $show_option_none;
+                $input = wp_dropdown_pages($args);
+                break;
 			case 'hidden': return sprintf('<input type="hidden" name="%1$s" value="%2$s" />', $fld_name, $value);	
 			default: $input = $value;	
 		}
@@ -201,21 +344,18 @@ if (! class_exists('Genesis_Club_Utils')) {
 		return sprintf($format, $label, $input);
 	}
 	
-	static function register_tooltip_styles() {
-		wp_register_style('diy-tooltip', plugins_url('styles/tooltip.css',dirname(__FILE__)), array(), null); 
+	function late_inline_styles($css) {
+		if (empty($css)) return;
+		print <<< SCRIPT
+<script type="text/javascript">
+//<![CDATA[
+jQuery(document).ready(function($) { 
+	$('<style type="text/css">{$css}</style>').appendTo('head');
+});	
+//]]>
+</script>
+	
+SCRIPT;
 	}
-
-	static function enqueue_tooltip_styles() {
-         wp_enqueue_style('diy-tooltip');
-         wp_enqueue_style('dashicons');
-    }
-
-    static function register_icons_font() {
-        global $wp_styles;
-        wp_enqueue_style( 'font-awesome', '//netdna.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css',array(),'4.3.0','all' );
-        wp_enqueue_style('font-awesome-ie7', plugins_url('styles/font-awesome-ie7.min.css', dirname(__FILE__)), array(), '4.3.0', 'all');
-        $wp_styles->add_data('font-awesome-ie7', 'conditional', 'lte IE 7');
-    }
-
  }
 }

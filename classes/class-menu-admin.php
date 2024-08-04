@@ -1,6 +1,7 @@
 <?php
 class Genesis_Club_Menu_Admin extends Genesis_Club_Admin {
-	private $tips = array(
+    private $menu;
+	protected $tips = array(
 		'threshold' => array('heading' => 'Device Threshold', 'tip' => 'Enter the size in pixels at which the full menu is collapsed into the "hamburger" icon or leave blank to disable this feature.'),
 		'icon_size' => array('heading' => 'Hamburger Icon Size', 'tip' => 'Size of the menu icon measured in rem, or leave blank to use the default which is 2.4 (1.5 times the size of a small icon).'),
 		'icon_color' => array('heading' => 'Hamburger Icon Color', 'tip' => 'Color of the hamburger menu icon (e.g #808080), or leave blank if you want the icon to adopt the same color as the links in the menu.'),
@@ -16,11 +17,12 @@ class Genesis_Club_Menu_Admin extends Genesis_Club_Admin {
 		'search_padding_top' => array('heading' => 'Padding Top', 'tip' => 'Enter padding above the search box (limit is 50px)'),
 		'search_padding_bottom' => array('heading' => 'Padding Bottom', 'tip' => 'Enter padding below the search box (limit is 50px)'),
 		'search_padding_threshold' => array('heading' => 'Padding Threshold', 'tip' => 'Remove padding for devices smaller than this threshold or leave blank to retain padding for all sizes of device'),
-		'search_button' => array('heading' => 'Add Search Button', 'tip' => 'Click checkbox to show a search button (providing your WordPress theme has a visible search button)'),
+		'search_button' => array('heading' => 'Add Search Button', 'tip' => 'Click checkbox to show a search button (providing your WordPress theme has a visible search button)')
 		);
 		
 	
 	function init() {
+	    $this->menu = $this->plugin->get_module('menu');
 		add_action('admin_menu',array($this, 'admin_menu'));
 	}
 	
@@ -35,14 +37,12 @@ class Genesis_Club_Menu_Admin extends Genesis_Club_Admin {
 		$this->print_admin_form($title, __CLASS__, $this->get_keys()); 
 	}    
 
-	
 	function load_page() {
 		$this->set_tooltips($this->tips);
  		if (isset($_POST['options_update'])) $this->save_menu();
-		$callback_params = array ('options' => Genesis_Club_Menu::get_options());
-		$this->add_meta_box('intro', 'Intro',  'intro_panel', $callback_params);
-		$this->add_meta_box('menu', 'Menu Settings', 'menu_panel', $callback_params);
-		$this->add_meta_box('news', 'Genesis Club News', 'news_panel',$callback_params, 'advanced');
+		$this->add_meta_box('intro', 'Intro',  'intro_panel');
+		$this->add_meta_box('menu', 'Menu Settings', 'menu_panel', array ('options' => $this->menu->get_options()));
+		$this->add_meta_box('news', 'Genesis Club News', 'news_panel',null, 'advanced');
 		add_action ('admin_enqueue_scripts',array($this, 'enqueue_admin_styles'));
 		add_action ('admin_enqueue_scripts',array($this, 'enqueue_metabox_scripts'));
 		add_action ('admin_enqueue_scripts',array($this, 'enqueue_postbox_scripts'));
@@ -50,24 +50,18 @@ class Genesis_Club_Menu_Admin extends Genesis_Club_Admin {
 
 	function save_menu() {
 		check_admin_referer(__CLASS__);
-		return $this->save_options('Genesis_Club_Menu', 'Menu');
-	}
-
- 	function intro_panel($post,$metabox){	 	
-		print <<< INTRO_PANEL
-<p>The following section allows you to set up responsive hamburger menus and a search box on the primary, secondary and right header navigation areas.</p>
-INTRO_PANEL;
+		return $this->save_options($this->menu, 'Menu');
 	}
 
 	function search_panel($options){	
       return 	
          $this->fetch_form_field('search_menu', $options['search_menu'], 'select', 
             array('none' => 'No Search Box','primary' => 'Primary Navigation', 'secondary' => 'Secondary Navigation', 'header' => 'Header Right')).
-         $this->responsive_text_field("search_text",$options['search_text'], 20) .
-         $this->responsive_text_field("search_text_color",$options['search_text_color'], 7, '', 'color-picker') .
-         $this->responsive_text_field("search_background_color",$options['search_background_color'], 7, '', 'color-picker') .
-         $this->responsive_text_field("search_border_color",$options['search_border_color'], 7, '', 'color-picker') .
-         $this->responsive_text_field("search_border_radius",$options['search_border_radius'], 5, 'px') .
+         $this->responsive_text_field( 'search_text', $options['search_text'], 20 ) .
+         $this->responsive_text_field( 'search_text_color', $options['search_text_color'], 7, '', 'color-picker' ) .
+         $this->responsive_text_field( 'search_background_color', $options['search_background_color'], 7, '', 'color-picker' ) .
+         $this->responsive_text_field( 'search_border_color', $options['search_border_color'], 7, '', 'color-picker' ) .
+         $this->responsive_text_field( 'search_border_radius', $options['search_border_radius'], 5, 'px' ) .
          $this->responsive_text_field('search_padding_top',$options['search_padding_top'], 2, 'px') .
          $this->responsive_text_field('search_padding_bottom',$options['search_padding_bottom'], 2, 'px') .
          $this->responsive_text_field('search_padding_threshold',$options['search_padding_threshold'], 4, 'px') .
@@ -76,26 +70,26 @@ INTRO_PANEL;
 
 	function hamburger_panel($options){	
       return 	
-         $this->responsive_text_field("threshold",$options['threshold'], 4, 'px') .
-         $this->responsive_text_field("icon_size",$options['icon_size'], 4, 'rem') .
-         $this->responsive_text_field("icon_color",$options['icon_color'], 7, '', 'color-picker') .
+         $this->responsive_text_field( 'threshold', $options['threshold'], 4, 'px' ) .
+         $this->responsive_text_field( 'icon_size', $options['icon_size'], 4, 'rem' ) .
+         $this->responsive_text_field( 'icon_color', $options['icon_color'], 7, '', 'color-picker' ) .
          $this->responsive_menu_locations('primary', $options['primary']) .
          $this->responsive_menu_locations('secondary', $options['secondary']) .
          $this->responsive_menu_locations('header', $options['header']);
 	}	
 
-	private function responsive_menu_locations($name, $val) {
+	function responsive_menu_locations($name, $val) {
 		$opts = array(
 			'0' => 'No responsive menu', 
 			'below' => 'Menu slides open below the hamburger');
 		$sidr = array(
 			'left' => 'Menu slides open on the left of the screen',
 			'right' => 'Menu slides open on the right of the screen');	
-		if (Genesis_Club_Utils::is_html5()) $opts = $opts + $sidr;	
+		if ($this->utils->is_html5()) $opts = $opts + $sidr;	
 		return $this->fetch_form_field($name,  $val, 'select', $opts) ;
 	}
 
-	private function responsive_text_field($name, $val, $size, $suffix='', $class='') {	
+	function responsive_text_field($name, $val, $size, $suffix='', $class='') {	
 		$args = array('size'=> $size);
 		if (!empty($suffix)) $args['suffix'] = $suffix;
 		if (!empty($class)) $args['class'] = $class;
@@ -104,11 +98,16 @@ INTRO_PANEL;
 
 	function menu_panel($post,$metabox) {
       $options = $metabox['args']['options'];
-      $this->display_metabox( array(
+      print $this->tabbed_metabox( $metabox['id'], apply_filters( 'genesis_club_menu_settings', array(
          'Reponsive Hamburger' => $this->hamburger_panel($options),
          'Search' => $this->search_panel($options),
-  //     'Fixed Header' => $this->fixed_panel($options)
-		));
+		), $options));
+   }	
+
+ 	function intro_panel(){	
+		print <<< INTRO_PANEL
+<p>The following section allows you to set up responsive hamburger menus and a search box on the primary, secondary and right header navigation areas.</p>
+INTRO_PANEL;
 	}
 
 }

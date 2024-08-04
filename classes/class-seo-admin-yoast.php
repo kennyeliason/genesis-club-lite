@@ -1,18 +1,25 @@
 <?php
-class Genesis_Club_Yoast_Admin extends Genesis_Club_Seo_Admin {
+class Genesis_Club_Seo_Yoast_Admin extends Genesis_Club_Seo_Admin {
     const CODE = 'genesis-club-yoast'; //prefix ID of CSS elements
+    const YOAST_FACEBOOK = 'yoast-facebook'; //count index
     
-	private $seo_headings = array('Title','Description','NoIndex','NoFollow');    
+    private $opengraph_metakey = Genesis_Club_Plugin::FACEBOOK_OPENGRAPH_METAKEY; 
+	private $seo_headings = array('Title','Description','NoIndex','NoFollow', 'OpenGraph');    
 	private $home_seo_option = array(
 		GENESIS_SEO_SETTINGS_FIELD => 'wpseo_titles');
 	private $home_seo_keys = array(
-		'home_doctitle' => 'title-home',
-		'home_description' => 'metadesc-home');
+		'home_doctitle' => 'title-home-wpseo',
+		'home_description' => 'metadesc-home-wpseo');
 	private $post_seo_keys = array(
 		'_genesis_title' => '_yoast_wpseo_title',
 		'_genesis_description' => '_yoast_wpseo_metadesc',
 		'_genesis_noindex' => '_yoast_wpseo_meta-robots-noindex',
 		'_genesis_nofollow' => '_yoast_wpseo_meta-robots-nofollow'
+		);
+	private $post_facebook_keys = array(
+		'og_title' => '_yoast_wpseo_opengraph-title',
+		'og_desc' => '_yoast_wpseo_opengraph-description',
+		'og_image' => '_yoast_wpseo_opengraph-image',
 		);
 	private $user_seo_keys = array(
 		'doctitle' => 'wpseo_title',
@@ -100,8 +107,24 @@ class Genesis_Club_Yoast_Admin extends Genesis_Club_Seo_Admin {
   		return $counts;
 	}
 
+	private function count_facebook_meta($post_type) {
+		global $wpdb;
+		$keys = $this->post_facebook_keys;
+        $yoast_key_list = "'" . implode("','",array_values($this->post_facebook_keys)) ."'";
+		$counts = array();
+		$counts[$this->opengraph_metakey] = 0;
+		$counts[self::YOAST_FACEBOOK] = 0;
+		$select = sprintf('SELECT CASE meta_key WHEN \'%3$s\' THEN \'%3$s\' ELSE \'%4$s\' END as meta_key, COUNT(DISTINCT post_ID) as tot FROM %1$spostmeta JOIN %1$sposts ON %1$sposts.ID = %1$spostmeta.post_ID WHERE post_status = \'publish\' AND post_type = \'%2$s\' AND meta_key IN (\'%3$s\',%5$s)  AND meta_value != \'\' GROUP BY CASE meta_key WHEN \'%3$s\' THEN \'%3$s\' ELSE \'%4$s\' END ;',
+				$wpdb->prefix, $post_type, $this->opengraph_metakey, self::YOAST_FACEBOOK, $yoast_key_list ); 
+		$results = $wpdb->get_results($select);
+		foreach ( $results as $result )
+            $counts[$result->meta_key] = $result->tot;
+  		return $counts;
+	}
+
 	private function count_post_meta($post_type) {
 		global $wpdb;
+		$facebook_counts = $this->count_facebook_meta($post_type);
 		$keys = $this->post_seo_keys;
 		$counts = array();
 		foreach ($keys as $k => $v) {
@@ -116,6 +139,8 @@ class Genesis_Club_Yoast_Admin extends Genesis_Club_Seo_Admin {
 				else
 					$counts[1][$result->meta_key] = $result->tot;
 		}
+		if (isset($facebook_counts[$this->opengraph_metakey])) $counts[0][$this->opengraph_metakey] = $facebook_counts[$this->opengraph_metakey];
+		if (isset($facebook_counts[self::YOAST_FACEBOOK])) $counts[1][self::YOAST_FACEBOOK] = $facebook_counts[self::YOAST_FACEBOOK];
   		return $counts;
 	}
 
@@ -171,8 +196,7 @@ INTRO_PANEL;
 		$this->print_row('Author Archive', $this->count_user_meta());
 		foreach ($taxonomies as $taxonomy ) $this->print_row($taxonomy .' Archive', $this->count_tax_meta($taxonomy)); 	
 		print('</tbody></table>');
-		$this->print_form_field('copy_seo_meta',  
-			 $this->submit_button($this->get_button_label()), 'button', array(), array(), 'p');
+		print $this->fetch_form_field('copy_seo_meta',  $this->submit_button($this->get_button_label()), 'button', array(), array(), 'p');
 	} 
 
 	private function copy_archive_meta() {
@@ -255,6 +279,33 @@ INTRO_PANEL;
   		return $updated ? 'Updated post SEO titles and descriptions. ' : '';
 	}
 
+	private function copy_facebook_meta() {
+		global $wpdb;
+		$reverse = ! $this->is_yoast_installed() ; 		
+		$updated = false;
+		if ($reverse) {
+            $post_meta = array();
+            $genesis_keys = array_flip($this->post_facebook_keys);
+            $yoast_key_list = "'" . implode("','",array_values($this->post_facebook_keys)) ."'";
+            $select = sprintf('SELECT %1$sposts.ID, meta_key, meta_value FROM %1$spostmeta JOIN %1$sposts ON %1$sposts.ID = %1$spostmeta.post_ID WHERE post_status = \'publish\' AND meta_key IN (%2$s) AND meta_value != \'\' ;',
+				$wpdb->prefix, $yoast_key_list); 
+            $results = $wpdb->get_results($select);
+			foreach ( $results as $result ) $post_meta[$result->ID][$genesis_keys[$result->meta_key]] = $result->meta_value;
+            foreach ( $post_meta as $key => $values) {
+                update_post_meta ($key, $this->opengraph_metakey, (array) $values) ;
+            }
+		} else {
+             $select = sprintf('SELECT %1$sposts.ID, meta_key, meta_value FROM %1$spostmeta JOIN %1$sposts ON %1$sposts.ID = %1$spostmeta.post_ID WHERE post_status = \'publish\' AND meta_key = \'%2$s\' AND meta_value != \'\' ;',
+				$wpdb->prefix, $this->opengraph_metakey);            
+            $results = $wpdb->get_results($select);
+			foreach ( $results as $result ) 
+                foreach ($this->post_facebook_keys as $k => $v) 
+                    if (isset($result->meta_value[$k])) 
+                        update_post_meta ($result->ID, $v, $result->meta_value[$k]);
+		}
+  		return $updated ? 'Updated post Facebook titles, descriptions and images. ' : '';
+	}
+
 
 	private function copy_meta() {
 		$message = '';
@@ -262,7 +313,8 @@ INTRO_PANEL;
 		$message .= $this->copy_post_meta() ;
 		$message .= $this->copy_user_meta() ;
 		$message .= $this->copy_archive_meta() ;
-		$subject = $this->is_yoast_installed() ? 'Genesis SEO To Yoast SEO Migration:' : 'Yoast SEO To Genesis SEO Migration:';
+		$message .= $this->copy_facebook_meta() ;
+		$subject = $this->is_yoast_installed() ? 'Migrate Genesis SEO To Yoast SEO:' : 'Migrate Yoast SEO To Genesis SEO:';
 		if (empty($message)) 
 			$this->add_admin_notice($subject, 'No updates took place', true);	         
 		else

@@ -1,37 +1,44 @@
 <?php
-if (!class_exists('Genesis_Club_Feed_Widget')) {
- class Genesis_Club_Feed_Widget extends WP_Widget_RSS {
+if (!class_exists('Genesis_Club_News')) {
+ class Genesis_Club_News {
+    const SCRIPT_VAR = 'genesis_club_news';
+    const HANDLE = 'genesis-club-news';
+    const RESULTS = 'genesis-club-news-feed';
 
-	function __construct() {
-		$widget_ops = array( 'description' => __('Displays Featured image in place of title in any RSS or Atom feed.') );
-		$control_ops = array( 'width' => 400, 'height' => 200 );
-		parent::__construct( 'genesis-club-feed', __('Genesis Club Feed'), $widget_ops, $control_ops );
+    private $version;
+
+	function __construct($version) {
+        $this->version = $version;
+      add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
+      add_action( 'wp_ajax_'.self::SCRIPT_VAR, array($this, 'get_feeds_ajax') );
 	}
 
-	function widget($args, $instance) {
+   function enqueue_scripts() {
+    	wp_enqueue_script(self::HANDLE, plugins_url('scripts/jquery.news.js', dirname(__FILE__)), array('jquery'), $this->version, true);         
+        wp_localize_script( self::HANDLE, self::SCRIPT_VAR,
+             array( 
+                 'ajaxurl' => admin_url( 'admin-ajax.php' ),
+                 'ajaxnonce'   => wp_create_nonce( self::SCRIPT_VAR.'_nonce' ),
+                 'ajaxaction'   => self::SCRIPT_VAR,
+                 'ajaxresults'  => '.'.self::RESULTS
+              ) 
+        );      
+   }
 
-		if ( isset($instance['error']) && $instance['error'] )
-			return;
+   function get_feeds_ajax() {
+      check_ajax_referer( self::SCRIPT_VAR.'_nonce', 'security' );
+      $url = isset($_POST['url']) ? $_POST['url'] : '';
+      if (empty($url)) wp_send_json_error( array( 'error' => __( 'Feed URL not supplied.' ) ) );
 
-		$title = $instance['title'];
-		$desc = '';
-		$link = '';
-
-		/** This filter is documented in wp-includes/default-widgets.php */
-		$title = apply_filters( 'widget_title', $title, $instance, $this->id_base );
-
-		echo $args['before_widget'];
-		
-		if ( $title ) {
-			echo $args['before_title'] . $title . $args['after_title'];
+      $instance = array('url' => $url, 'show_summary' => false, 'show_featured' => true);
+      $feed = $this->get_rss_feed_instance($instance);
+      if( isset( $feed ) )
+         wp_send_json_success( $feed );
+      else
+         wp_send_json_error( array( 'error' => __( 'Could not retrieve feed '.$url ) ) );
 		}
 
-		self::rss_output($instance );
-		
-		echo $args['after_widget'];
-	}
-
-	static function rss_output( $instance ) {
+	function get_rss_feed_instance( $instance ) {
 
 		$url = ! empty( $instance['url'] ) ? $instance['url'] : '';
 
@@ -52,7 +59,7 @@ if (!class_exists('Genesis_Club_Feed_Widget')) {
 			return;
 		}
 
-		$default_args = array( 'show_featured' => 0, 'show_author' => 0, 'show_date' => 0, 'show_summary' => 0, 'items' => 0 );
+		$default_args = array( 'show_featured' => 0, 'show_summary' => 0, 'show_author' => 0, 'show_date' => 0,  'items' => 0 );
 
 		if (($parsed_url = parse_url($url))
  		&& ($query = isset($parsed_url['query']) ? $parsed_url['query'] : '')) {
@@ -70,9 +77,9 @@ if (!class_exists('Genesis_Club_Feed_Widget')) {
 		$show_date     = (int) $args['show_date'];
 	
 		if ( !$rss->get_item_quantity() ) {
-			echo '<div>' . __( 'An error has occurred, which probably means the feed is down. Try again later.' ) . '</div>';
-			return;
+			return '<div>' . __( 'An error has occurred, which probably means the feed is down. Try again later.' ) . '</div>';
 		}
+        $results = '';
 
 		foreach ( $rss->get_items( 0, $items ) as $item ) {
 			$link = $item->get_link();
@@ -127,24 +134,22 @@ if (!class_exists('Genesis_Club_Feed_Widget')) {
 			}
 
 			if ($link) $title = sprintf('<a target="_blank" class="rsswidget" href="%1$s"%2$s>%3$s</a>', $link, $link_title, $title);
-			printf('<span class="diy-image-feed-widget-item"><span>%1$s</span>%2$s%3$s%4$s</span>', $title, $date, $summary, $author );
+			$results .= sprintf('<div class="%5$s-item"><div>%1$s</div>%2$s%3$s%4$s</div>', $title, $date, $summary, $author, self::RESULTS );
 		}
 
 		if ( ! is_wp_error($rss) )
 			$rss->__destruct();
 		unset($rss);		
+		return $results;		
 	}
 
-	static function display_feeds($feeds = false) {
+	function display_feeds($feeds = false) {
 		if (is_array($feeds) && (count($feeds) > 0)) {
-			echo '<div class="diy-image-feed-widget">';
-			foreach( $feeds as $url ) {
-				$args = array('url' => $url, 'show_summary' => true, 'show_featured' => true);
-				self::rss_output( $args );
+         printf ('<div class="%1$s"></div>',self::RESULTS);
+			for($index=0; $index < count($feeds); $index++ ) {			
+            wp_localize_script( self::HANDLE, self::SCRIPT_VAR.$index, array( 'feedurl' => $feeds[$index]) );     
+		   }                                                               
 			}
-			echo "</div>";
 		}
 	}
-
-  }
 }

@@ -1,5 +1,6 @@
 <?php
 class Genesis_Club_Accordion_Admin extends Genesis_Club_Admin {
+   private $accordion;
 	protected $tips = array(
 		'accordion_enabled' => array('heading' => 'Accordion Enabled', 'tip' => 'Click to enable the accordion on this page'),
 		'accordion_header_class' => array('heading' => 'Header Class', 'tip' => 'Enter a custom class if you want to override the accordion header styling.'),
@@ -12,13 +13,15 @@ class Genesis_Club_Accordion_Admin extends Genesis_Club_Admin {
 		);
 	
 	function init() {		
+        $this->accordion = $this->plugin->get_module('accordion');
 		add_action('admin_menu',array($this, 'admin_menu'));
 		add_action('load-post.php', array($this, 'load_post_page'));	
 		add_action('load-post-new.php', array($this, 'load_post_page'));	
 		add_action('load-edit-tags.php', array($this, 'load_archive_page'));	
+        add_action('load-term.php', array($this, 'load_archive_page'));	
 		add_action('edit_term', array($this, 'save_archive'), 10, 2 );	
 		add_action('do_meta_boxes', array($this, 'do_meta_boxes'), 20, 2 );
-		add_action('save_post', array($this, 'save_postmeta'));
+		add_action('save_post', array($this, 'save_post'));
 	}
 	
 	function admin_menu() {
@@ -33,7 +36,6 @@ class Genesis_Club_Accordion_Admin extends Genesis_Club_Admin {
 	} 	
 	
 	function load_page() {
-		Genesis_Club_Accordion::add_accordion (array('enabled' => true, 'header_class' => '', 'content_class' => '.accordion-content no-margin'));
 		$this->add_meta_box('intro', 'Instructions',  'intro_panel');
 		$this->add_meta_box('accordion', 'Accordion',  'accordion_panel');
 		$this->add_meta_box('news', 'Genesis Club News', 'news_panel', null, 'advanced');
@@ -48,16 +50,16 @@ class Genesis_Club_Accordion_Admin extends Genesis_Club_Admin {
 
 	function load_archive_page() {
       if (isset($_GET['post_type'])
-      && Genesis_Club_Plugin::is_post_type_enabled($_GET['post_type'])) {
-		add_filter( 'genesis_club_archive_settings', array($this, 'add_archive_panel'), 10, 3 );	
-		$this->set_tooltips($this->tips);
-	}
+      && $this->plugin->is_post_type_enabled($_GET['post_type'])) {
+         add_filter( Genesis_Club_Dashboard::ARCHIVE_HOOK_ID, array($this, 'add_archive_panel'), 10, 3 );	
+         $this->set_tooltips($this->tips);
+      }
 	}
 	
 	function do_meta_boxes( $post_type, $context) {
 	  if ($this->is_metabox_active($post_type, $context)) {
 		    add_filter( 'genesis_club_post_settings', array($this, 'add_post_panel'), 10, 2);	//add to plugin metabox
-		}
+	  }
 	}
 	
 	function intro_panel() {
@@ -72,7 +74,7 @@ INTRO;
 	}
 	
  	function accordion_panel($post,$metabox) {
-      $this->display_metabox( array(
+      print $this->tabbed_metabox( $metabox['id'], array(
          'Help' => $this->help_panel(),
          'Tips' => $this->tips_panel(),
          'Example' => $this->example_panel(),
@@ -96,12 +98,11 @@ HELP;
 		return <<< TIPS
 <p>Use a single page for your FAQ when you have relatively few questions and short answers and you do not envisage your FAQ changing much over time.</p>
 <p>Conversely, if you have many questions, long answers or frequent updates then choosing the FAQ category approach will be better from the point of view of SEO, the user experience, and from  administration of the FAQ.</p>
-<p>Also remember that if you have a lot of frequently asked questions you may want to break it up into separate FAQs which can be subcategories. For example, on the <a href="http://www.genesisclub.co">Genesis Club website</a>, we have a Genesis FAQ, a Membership FAQ and a WordPress FAQ.</p>
 TIPS;
 	}
 	
 	function example_panel() {
-		Genesis_Club_Accordion::add_accordion(array('enabled' => true));
+		$this->accordion->add_accordion (array('enabled' => true, 'type' => 'demo', 'header_class' => '', 'content_class' => '.accordion-content no-margin'));
 		$support_url = GENESIS_CLUB_SUPPORT_URL;
 		return <<< EXAMPLE
 <p>Click the questions below to see an accordion FAQ in action.</p>
@@ -118,31 +119,32 @@ TIPS;
 <h3>But What If I Want Multiple FAQs?</h3>
 <p>Not a problem. Either use different categories or sub-categories for each FAQ. You can put FAQ as an entry on the menu, and use sub menu options for each sub-category FAQ. It is all good!</p>
 <h3>I Have Set Up A FAQ But It Is Not FAQing Working!!!</h3>
-<p>Calm down dear! Help is at hand. Head over to the <a target="_blank" href="https://www.facebook.com/DIYWebmastery">DIYWebmastery page on Facebook</a> and ask your question.  Or, if you have an up to date licence you can get priority support at  <a href="{$support_url}">Genesis Club Pro Support</a>.</p>  
+<p>Calm down dear! Help is at hand. Head over to the <a target="_blank" href="https://www.facebook.com/GenesisClubbers">DIYWebmastery page on Facebook</a> and ask your question.  Or, if you have an up to date licence you can get priority support at  <a href="{$support_url}">Genesis Club Pro Support</a>.</p>  
 </div>
 EXAMPLE;
 	}
 	
 	function save_archive($term_id, $tt_id) {
 		return isset( $_POST['accordion'] ) ?
-			Genesis_Club_Accordion::save_accordion('terms', $term_id, (array) $_POST['accordion']) : false;
+			$this->accordion->save_accordion('terms', $term_id, (array) $_POST['accordion']) : false;
 	}	
 
-	function save_postmeta($post_id) {
+	function save_post($post_id) {
+        if ( wp_is_post_revision( $post_id ) ) return;
 		return isset( $_POST['accordion'] ) ?  
-			Genesis_Club_Accordion::save_accordion('posts', $post_id, (array) $_POST['accordion']) : false;
+			$this->accordion->save_accordion('posts', $post_id, (array) $_POST['accordion']) : false;
 	}
 
 	function add_post_panel($content, $post) {
-		return $content + array ('Accordion' => $this->accordion_section(Genesis_Club_Accordion::get_accordion('posts', $post->ID), false)) ;
+		return $content + array ('Accordion' => $this->accordion_section($this->accordion->get_accordion('posts', $post->ID), false)) ;
    }	
 
 	function add_archive_panel($content, $term, $tt_id) {
-		return array ('Accordion' => $this->accordion_section(Genesis_Club_Accordion::get_accordion('terms', $term->term_id), true)) + $content ;
+		return array ('Accordion' => $this->accordion_section($this->accordion->get_accordion('terms', $term->term_id), true)) + $content ;
 	}	
 
 	private function accordion_section($accordion, $is_archive){
-		$defaults = array('enabled' => '', 'header_class' => '', 'content_class' => '', 'container_class' => '', 'header_depth' => false, 'scroll_top' => false, 'open_first' => false, 'nopaging' => false);
+		$defaults = $this->accordion->get_accordion_defaults();
 		$accordion = is_array($accordion) ?  shortcode_atts($defaults,$accordion) : $defaults;
 		if ($is_archive) {  //use table on archive pages
 			$start_wrap = '<table class="form-table">';

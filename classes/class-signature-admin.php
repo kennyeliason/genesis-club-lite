@@ -1,8 +1,10 @@
 <?php
 class Genesis_Club_Signature_Admin extends Genesis_Club_Admin {
     const TOGGLE_SIGNATURE = 'genesis_club_toggle_signature';
+    private $signature;
 
 	function init() {		
+	    $this->signature = $this->plugin->get_module('signature');
 		$this->slug = 'user';
 		add_action('load-profile.php', array($this, 'load_profile'));	
 		add_action('load-user-edit.php', array($this, 'load_profile'));	
@@ -85,7 +87,7 @@ class Genesis_Club_Signature_Admin extends Genesis_Club_Admin {
        		if (isset($file['url'])) $_POST[$key1] = $file['url'];
       	}
 		$old_val = get_user_option($key1, $user_id);		
-		$new_val = $_POST[$key1];
+		$new_val = isset($_POST[$key1]) ? $_POST[$key1] : '';
 		if ($old_val != $new_val) update_usermeta( $user_id, $key1, $new_val);		
 		
 		$key2 = Genesis_Club_Signature::SIGNATURE_ON_POSTS_KEY;
@@ -134,7 +136,7 @@ class Genesis_Club_Signature_Admin extends Genesis_Club_Admin {
    }
 
 	function fetch_page_visibility($post) {
-		$meta_key = Genesis_Club_Signature::get_toggle_meta_key($post->post_type, $post->post_author);
+		$meta_key = $this->signature->get_toggle_meta_key($post->post_type, $post->post_author);
 		return $this->form_field(self::TOGGLE_SIGNATURE, self::TOGGLE_SIGNATURE, 
 			__(strpos($meta_key, 'hide') !== FALSE ? 'Do not show the author signature on this page' : 'Show the author signature on this page'), 
 			get_post_meta($post->ID, $meta_key, true),  'checkbox', array(), array(), 'br') ;
@@ -144,7 +146,7 @@ class Genesis_Club_Signature_Admin extends Genesis_Club_Admin {
 		$post_type = get_post_type( $post_id);
 		$post_author = get_post_field( 'post_author', $post_id);	
 		$key = self::TOGGLE_SIGNATURE;
-		$meta_key = Genesis_Club_Signature::get_toggle_meta_key($post_type, $post_author);	
+		$meta_key = $this->signature->get_toggle_meta_key($post_type, $post_author);	
 		update_post_meta( $post_id, $meta_key, array_key_exists($key, $_POST) ? $_POST[$key] : false);
 	}
 
@@ -220,14 +222,14 @@ FAQ;
 	}	
 
 	function example_panel() {
-		$usersig = Genesis_Club_Signature::get_author_signature(get_current_user_id());
+		$usersig = $this->signature->get_author_signature(get_current_user_id());
 		return sprintf('<p><img src="%1$s" alt="Author Signature"/></p>', 
 			!empty($usersig) ? $usersig :  plugins_url('images/signature-example.png',dirname(__FILE__)));		
 	}	
 	
 
 	function signature_panel($post,$metabox) {
-       return $this->display_metabox( array(
+       print $this->tabbed_metabox( $metabox['id'], array(
          'Help' => $this->help_panel(),
          'FAQ' => $this->faq_panel(),
          'Example Signature' => $this->example_panel($post)

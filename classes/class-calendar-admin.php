@@ -1,5 +1,6 @@
 <?php
 class Genesis_Club_Calendar_Admin extends Genesis_Club_Admin {
+   private $calendar;
 	private $tips = array(
 		'src' => array('heading' => 'Calendar URL', 'tip' => 'URL of the calendar. This is the src parameter in the iframe querystring and typically ends in calendar.google.com or gmail.com'),
 		'mode' => array('heading' => 'Mode', 'tip' => 'Show calendar by week, by month or as an agenda.'),
@@ -23,6 +24,7 @@ class Genesis_Club_Calendar_Admin extends Genesis_Club_Admin {
 	);
 	
 	function init() {
+	  $this->calendar = $this->plugin->get_module('calendar');
 		add_action('admin_menu',array($this, 'admin_menu'));
 	}
 	
@@ -40,7 +42,7 @@ class Genesis_Club_Calendar_Admin extends Genesis_Club_Admin {
 	function load_page() {
  		if ( isset($_POST['options_update']) ) $this->save_calendar();	
 		$this->add_meta_box('intro', 'Intro', 'intro_panel' );
-		$this->add_meta_box('menu', 'Google Calendar Defaults', 'calendar_panel', array ('options' => Genesis_Club_Calendar::get_options()) );
+		$this->add_meta_box('menu', 'Google Calendar Defaults', 'calendar_panel', array ('options' => $this->calendar->get_options()) );
 		$this->add_meta_box('news', 'Genesis Club News', 'news_panel', null, 'advanced');
 		$this->set_tooltips($this->tips);
 		add_action('admin_enqueue_scripts',array($this, 'enqueue_admin_styles'));
@@ -51,12 +53,12 @@ class Genesis_Club_Calendar_Admin extends Genesis_Club_Admin {
 	function save_calendar() {
 		check_admin_referer(__CLASS__);
 		$_POST['src'] = rawurldecode($_POST['src']);
-		return $this->save_options('Genesis_Club_Calendar','Calendar Settings');
+		return $this->save_options($this->calendar,'Calendar Settings');
 	}
 	 
 	function calendar_panel($post,$metabox) {
       $options = $metabox['args']['options'];
-      $this->display_metabox( array(
+      print $this->tabbed_metabox( $metabox['id'], array(
          'Calendar' => $this->source_panel($options),
          'Size' => $this->size_panel($options),
          'Colors' => $this->colors_panel($options),
@@ -68,8 +70,8 @@ class Genesis_Club_Calendar_Admin extends Genesis_Club_Admin {
 	function source_panel($options){	
 	  return
 		$this->fetch_form_field("src", $options['src'], 'text', array(), array('size' => 80)) .	
-		$this->fetch_form_field("mode", $options['mode'], 'radio', Genesis_Club_Calendar::modes()).
-      $this->fetch_form_field("wkst", $options['wkst'], 'radio', Genesis_Club_Calendar::weekdays()) ;
+		$this->fetch_form_field("mode", $options['mode'], 'radio', $this->calendar->modes()).
+        $this->fetch_form_field("wkst", $options['wkst'], 'radio', $this->calendar->weekdays()) ;
 	}
 
 	function size_panel($options){	
@@ -81,7 +83,7 @@ class Genesis_Club_Calendar_Admin extends Genesis_Club_Admin {
 	function colors_panel($options){	   
       return
          $this->fetch_form_field("border", $options['border'], 'text', array(), array('size' => 30)) .
-         $this->fetch_form_field("color", $options['color'], 'select', Genesis_Club_Calendar::text_colors()) .
+         $this->fetch_form_field("color", $options['color'], 'select', $this->calendar->text_colors()) .
          $this->fetch_form_field("bgcolor", $options['bgcolor'], 'text', array(), array('size' => 7, 'class' => 'color-picker')) ;
    }
    
@@ -98,14 +100,14 @@ class Genesis_Club_Calendar_Admin extends Genesis_Club_Admin {
 	
 	function timezone_panel($options){	
       return
-         $this->fetch_form_field("timezone_locator", $options['timezone_locator'], 'radio', Genesis_Club_Calendar::timezone_locations()) .
+         $this->fetch_form_field("timezone_locator", $options['timezone_locator'], 'radio', $this->calendar->timezone_locations()) .
          $this->fetch_form_field("label", $options['label'], 'textarea', array(), array('rows' => 3, 'cols' => 80)) .
-         $this->fetch_form_field("timezone", $options['timezone'], 'select', Genesis_Club_Calendar::timezones()) ;
+         $this->fetch_form_field("timezone", $options['timezone'], 'select', $this->calendar->timezones()) ;
 	}	
   
   function upgrade() {
-      $options = Genesis_Club_Calendar::get_options();
-      if ( (! array_key_exists('src', $options) || empty($options['src']) ) && !empty($options['iframe']) ) {
+      $options = $this->calendar->get_options();
+      if (is_array($options) && !empty($options['iframe']) && (! array_key_exists('src', $options) || empty($options['src']) ) ) {
          $options['src'] = self::get_qryitem_from_iframe($options['iframe'], 'src');
          $options['mode'] = self::get_qryitem_from_iframe($options['iframe'], 'mode');
          $options['wkst'] = self::get_qryitem_from_iframe($options['iframe'], 'wkst');
@@ -122,7 +124,7 @@ class Genesis_Club_Calendar_Admin extends Genesis_Club_Admin {
          $options['show_tz'] = self::get_qryitem_from_iframe($options['iframe'], 'showTz');
          $options['timezone_locator'] = 'below';
          $options['iframe'] = '';
-         return Genesis_Club_Calendar::save_options($options);
+         return $this->calendar->save_options($options);
       }
    }
   
@@ -140,7 +142,7 @@ class Genesis_Club_Calendar_Admin extends Genesis_Club_Admin {
              $val = substr($iframe, 
                strpos($iframe, $needle2)+strlen($needle2),
                strpos($iframe, '&',strpos($iframe, $needle2)+strlen($needle2)+1)-strpos($iframe, $needle2)-strlen($needle2));  
-      return $val ? urldecode($val) : Genesis_Club_Calendar::get_default($item);
+      return $val ? urldecode($val) : $this->calendar->get_default($item);
   }
 
    function get_height_from_iframe($iframe) {
@@ -149,7 +151,7 @@ class Genesis_Club_Calendar_Admin extends Genesis_Club_Admin {
              $height = substr($iframe, 
                strpos($iframe, 'height="')+8,
                strpos($iframe, '"', strpos($iframe, 'height="')+9)-strpos($iframe, 'height="')-8);   
-      return $height ? $height : Genesis_Club_Calendar::get_default('height');
+      return $height ? $height : $this->calendar->get_default('height');
   }
 
    function get_width_from_iframe($iframe) {
@@ -158,7 +160,7 @@ class Genesis_Club_Calendar_Admin extends Genesis_Club_Admin {
              $width = substr($iframe, 
                strpos($iframe, 'width="')+7,
                strpos($iframe, '"', strpos($iframe, 'width="')+8)-strpos($iframe, 'width="')-7);   
-      return $width ? $width : Genesis_Club_Calendar::get_default('width');
+      return $width ? $width : $this->calendar->get_default('width');
   }  
 
  	function intro_panel($post,$metabox){	

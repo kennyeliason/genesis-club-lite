@@ -1,39 +1,94 @@
 <?php
+if (!class_exists('Genesis_Club_Options')) {
 class Genesis_Club_Options {
-	const OPTIONS_NAME  = 'genesis_club_options';
-	protected static $defaults = array( 'display_disabled' => false, 
-				'accordion_disabled' => false, 'background_disabled' => false, 'bar_disabled' => false, 
-				'calendar_disabled' => false, 'footer_disabled' => false, 'fonts_disabled' => false, 'icons_disabled' => false, 
-				'landing_disabled' => false, 'media_disabled' => false, 'menu_disabled' => false, 'post_disabled' => false, 
-				'seo_disabled' => false, 'signature_disabled' => false, 'slider_disabled' => false, 
-				'social_disabled' => false, 'api_disabled' => false, 'custom_post_types' => array(), 
-	); 		
 
-    protected static $options = null;	
+	protected $option_name;
+	protected $options = array();
+	protected $defaults = array();
+	protected $encoded = false;
 
-    public static function init($more = array()) {
-        if (self::$options === null) self::$options = new Genesis_Club_DIY_Options(self::OPTIONS_NAME, self::$defaults);
-		if (count($more) > 0) self::$options->add_defaults($more);
+	function __construct($option_name, $defaults = array(), $encoded = false) {
+		$this->option_name = $option_name;
+		$this->defaults = $defaults;
+		$this->encoded = $encoded;
+	}
+
+	function add_defaults($more = array()) {
+		$this->defaults = array_merge($this->defaults, (array)$more);
+		$this->options = array(); //clear cache
+	}	
+
+	function get_defaults() {
+		return $this->defaults;
+	}
+
+	function get_default($option_name) {
+    	if ($option_name && array_key_exists($option_name, $this->defaults))
+        	return  $this->defaults[$option_name];
+    	else
+        	return false;
+	}	
+
+	function get_option_name() {
+		return $this->option_name;
+	}
+
+	function get_options($cache = true) {
+		if ($cache && (count($this->options) > 0)) return $this->options;
+		$the_options = get_option($this->get_option_name());
+		if (! empty($the_options) && ! is_array($the_options) && $this->encoded) 
+			$the_options = unserialize(strrev(base64_decode($the_options)));
+		$this->options = empty($the_options) ? $this->get_defaults() : shortcode_atts( $this->get_defaults(), $the_options);
+		return $this->options;
+	}
+	
+	function get_option($option_name, $cache = true) {
+    	$options = $this->get_options($cache);
+    	if ($option_name && $options && array_key_exists($option_name,$options))
+         if (($defaults = $this->get_default($option_name)) && is_array($defaults) && is_array($options[$option_name])) 
+            return $this->validate_options($defaults, $options[$option_name]);
+         else
+            return $options[$option_name];
+    	else
+        	return $this->get_default($option_name);    		
     }
 
-	public static function get_options ($cache = true) {
-		return self::$options->get_options($cache = true); 
-	}
-
-	public static function get_option($option_name, $cache = true) {
-	    return self::$options->get_option($option_name, $cache); 
-	}
-
-	public static function save_options ($options) {
-		return self::$options->save_options($options);
-	}
-
-	public static function validate_options ($defaults, $options) {
-		return self::$options->validate_options((array)$defaults, (array)$options);
+	function save_options($new_options) {
+		$options = $this->get_options(false);
+		$new_options = shortcode_atts( $this->get_defaults(), array_merge($options, $new_options));
+		if ($this->encoded) $new_options = base64_encode(strrev(serialize($new_options)));
+		$updated = update_option($this->get_option_name(),$new_options);
+		if ($updated) $this->get_options(false);
+		return $updated;
 	}	
 
-	public static function upgrade_options () {
-		return self::$options->upgrade_options();
-	}	
+	function validate_options($defaults, $options) {
+		if (is_array($defaults) )
+    		if (is_array($options)) 
+    		return shortcode_atts($defaults, $options);		
+		else
+                return $defaults;
+		else
+    		return false;		
+    }
 
+	function upgrade_options() {
+      /* Remove old options and set defaults for new options */ 
+		$new_options = array();
+		$defaults = $this->get_defaults();
+		$old_options = get_option($this->get_option_name());
+
+		if (is_array($old_options)) {
+			foreach ($defaults as $key => $subdefaults) 
+				if (array_key_exists($key, $old_options)) 
+					if (is_array($old_options[$key]) && is_array($subdefaults)) 
+						$new_options[$key] = shortcode_atts($subdefaults, $old_options[$key]);
+					else
+						$new_options[$key] = $old_options[$key];
+		} else {		
+			$new_options = $defaults;
+	}
+		$this->save_options($new_options);
+	}
+  }	
 }

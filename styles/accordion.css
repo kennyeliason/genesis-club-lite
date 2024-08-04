@@ -1,4 +1,4 @@
-
+/* Genesis Club Accordion */
 .accordion-container { margin: 0 !important; border: 0 !important; padding: 0 !important; }
 
 .accordion-container > p { padding: 0.5rem 1.5rem; }
@@ -53,6 +53,23 @@ border: 0;
 
 header.accordion-header.accordion-default-colors a, h2.accordion-header.accordion-default-colors a, h3.accordion-header.accordion-default-colors { 
 color: #808080;
+}
+
+.accordion-header.arrows:before {
+   content: " ";
+	width: 0; 
+	height: 0; 
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;	
+	border-top: 5px solid black;
+   float:right;
+   margin-top: 10px;
+   vertical-align:top;
+}
+
+.accordion-header.accordion-selected.arrows:before {
+   border-top: none;
+	border-bottom: 5px solid black;
 }
 
 .accordion-header.accordion-default-colors:hover,

@@ -3,9 +3,11 @@ require_once(ABSPATH . 'wp-admin/includes/class-wp-list-table.php');
 
 class Genesis_Club_Fonts_Table extends WP_List_Table {
 
+	private $fonts;
 	private $slug;
 	
- 	function __construct($admin_url) {
+ 	function __construct($admin_url, $fonts) {
+		$this->fonts = $fonts;
  		 $this->slug = $admin_url; 
  		 parent::__construct( array('plural' => 'fonts') );
  	}
@@ -23,7 +25,7 @@ class Genesis_Club_Fonts_Table extends WP_List_Table {
 		$per_page = 50;
 		$paged = $this->get_pagenum();
 		$this->items = array();
-		if (($families = Genesis_Club_Fonts::get_option('families'))
+		if (($families = $this->fonts->get_option('families'))
 		&& is_array($families)) {
          foreach ($families as $key => $values)
 			   $this->items[] = json_decode(json_encode(array('font_id' => $key)+$values), FALSE);

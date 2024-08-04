@@ -1,88 +1,76 @@
 <?php
-class Genesis_Club_Fonts {
-   const GOOGLE_FONTS_API_KEY = 'AIzaSyCU14DFkcbylw3t2kVmk89PblbmV5GPR7E';
-   const OPTION_NAME = 'fonts';
-   const ALL_FONTS_OPTION_NAME = 'genesis_club_fonts';
+class Genesis_Club_Fonts extends Genesis_Club_Module {
+	const GOOGLE_FONTS_API_KEY = 'AIzaSyCU14DFkcbylw3t2kVmk89PblbmV5GPR7E';
+	const OPTION_NAME = 'fonts';
+	const ALL_FONTS_OPTION_NAME = 'genesis_club_fonts';
 
-   protected static $effects = array('anaglyph','brick-sign','canvas-print','crackle','decaying','destruction','distressed','distressed-wood',
+	protected $effects = array('anaglyph','brick-sign','canvas-print','crackle','decaying','destruction','distressed','distressed-wood',
          'fire','fire-animation','fragile','grass','ice','mitosis','neon','outline','putting-green','scuffed-steel', 'shadow-multiple',
          'splintered','static','stonewash','3d', '3d-float','vintage', 'wallpaper');
 
-   protected static $subsets = array('latin','latin-ext','menu','arabic','bengali','cyrillic','cyrillic-ext','greek','greek-ext','hindi','khmer','korean','lao','tamil','vietnamese');
+  	protected $subsets = array('latin','latin-ext','menu','arabic','bengali','cyrillic','cyrillic-ext','greek','greek-ext','hindi','khmer','korean','lao','tamil','vietnamese');
 
-	protected static $defaults  = array(
+	protected $defaults  = array(
 		'families' => array(),
-      'subsets' => array('latin'),
-      'effects' => array(),
-      'fv' => array(),
-      'font_awesome' => false
+		'subsets' => array('latin'),
+		'effects' => array(),
+		'fv' => array()
 	);
 
-	static function init() {
-		Genesis_Club_Options::init(array(self::OPTION_NAME => self::$defaults));	
-		if (!is_admin()) {
-			add_action('wp', array(__CLASS__,'prepare'));
-		}		
+	function get_defaults() {
+       return $this->defaults; 
+    }
+   	
+	function get_options_name() {
+       return self::OPTION_NAME; 
 	}		
 
-	static function get_effects() {
-    	return self::$effects;		
+	function init() {
+		if (!is_admin()) {
+			add_action('wp', array($this,'prepare'));
+   }
    }
 
-	static function get_subsets() {
-    	return self::$subsets;		
+	function get_effects() {
+    	return $this->effects;		
    }
 
-	static function get_all_fonts() {
+	function get_subsets() {
+    	return $this->subsets;		
+    }
+
+	function get_all_fonts() {
     	return get_option(self::ALL_FONTS_OPTION_NAME, array());
-   }
-
-	static function save_options($new_options) {
-	   $new_options = array_merge(self::get_options(false), $new_options); //overwrite old options with new options 
-      $new_options = Genesis_Club_Options::validate_options(self::$defaults, $new_options); //filter out any invalid options
-    	return Genesis_Club_Options::save_options( array(self::OPTION_NAME => $new_options));		
     }
 
-	static function get_options() {
-    	return Genesis_Club_Options::get_option(self::OPTION_NAME);		
-    }
-	
-	static function get_option($option_name) {
-    	$options = self::get_options();
-    	if ($option_name && $options && array_key_exists($option_name,$options) && array_key_exists($option_name,self::$defaults))
-        	return $options[$option_name];
-    	else
-        	return false;    		
-    }
-
-	static function get_default($option_name) {
-      return array_key_exists($option_name, self::$defaults) ?  self::$defaults[$option_name] : false;
+	function get_default($option_name) {
+      return array_key_exists($option_name, $this->defaults) ?  $this->defaults[$option_name] : false;
    }
 
 
-   static function family_exists($font_id) {
-      return array_key_exists($font_id, self::get_families());
+   function family_exists($font_id) {
+      return array_key_exists($font_id, $this->get_families());
    }
       
-   static function get_families() {
-      if ($families = self::get_option('families'))
+   function get_families() {
+      if ($families = $this->get_option('families'))
          return (array)$families;
       else
          return array();
    }
 
-   static function save_families($families) {
-      $options = self::get_options(false);
-      array_walk($families, array(__CLASS__, 'add_fv'));
+   function save_families($families) {
+      $options = $this->get_options(false);
+      array_walk($families, array($this, 'add_fv'));
       ksort($families);
       $options['families'] = $families;
-      return self::save_options($options);
+      return $this->save_options($options);
    }
 
-   static function delete_families($font_ids) {
+   function delete_families($font_ids) {
 		$font_ids = (array)$font_ids;
 		$deleted= 0;
-		$families = self::get_families();
+	  $families = $this->get_families();
 		foreach ($font_ids as $font_id) {
 			$font_id = strtolower(trim($font_id));
          	if (array_key_exists($font_id, $families)) {
@@ -91,12 +79,12 @@ class Genesis_Club_Fonts {
          	}
       }
 		if($deleted)
-		    self::save_families($families);
+		  $this->save_families($families);
 
 		return $deleted;
     }
 
-	public static function add_fv(&$item, $key) {
+	 function add_fv(&$item, $key) {
       $variants = isset($item['variants']) ? (array)$item['variants'] : false;
       if (!$variants || ((count($variants) == 1) && ('regular' == $variants[0])))
          $item['fv'] =  urlencode($item['family']);
@@ -104,28 +92,25 @@ class Genesis_Club_Fonts {
          $item['fv'] = urlencode($item['family']) . ':' . implode(',', $variants);      
    }
 
-	public static function prepare() {
-      add_action('wp_enqueue_scripts', array(__CLASS__, 'enqueue_styles'));
+	public function prepare() {
+      add_action('wp_enqueue_scripts', array($this, 'enqueue_styles'));
 	}
 
-	public static function enqueue_styles() {
-      if ($families = self::get_option('families')) {
+	public function enqueue_styles() {
+      if ($families = $this->get_option('families')) {
          $fv = array();
          foreach ($families as $key => $values) $fv[] = $values['fv'];                 
          $args['family'] = implode('%7C', $fv);
          
-         if ($subsets = self::get_option('subsets')) 
+         if ($subsets = $this->get_option('subsets')) 
             $args['subset'] = implode('%2C', (array)$subsets);
 
-         if ($effects = self::get_option('effects')) 
+         if ($effects = $this->get_option('effects')) 
             $args['effect'] = implode('%7C', (array)$effects);
             
          $url = add_query_arg($args, sprintf('http%1$s://fonts.googleapis.com/css', is_ssl() ? 's' : '' ));
 
          wp_enqueue_style('genesis-club-fonts', $url, array(), null);
-      }
-	  if (self::get_option('font_awesome')) {
-         Genesis_Club_Utils::register_icons_font();
       }
 	}
 

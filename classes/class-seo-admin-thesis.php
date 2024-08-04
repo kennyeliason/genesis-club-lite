@@ -1,5 +1,5 @@
 <?php
-class Genesis_Club_Thesis_Admin extends Genesis_Club_Seo_Admin {
+class Genesis_Club_Seo_Thesis_Admin extends Genesis_Club_Seo_Admin {
 
 	private $seo_headings = array('Title','Description','NoIndex','NoFollow','NoArchive','Headline','Intro');
 	

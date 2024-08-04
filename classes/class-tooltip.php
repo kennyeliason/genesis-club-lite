@@ -1,6 +1,6 @@
 <?php
 if (!class_exists('Genesis_Club_Tooltip')) {
-  class Genesis_Club_Tooltip {
+class Genesis_Club_Tooltip {
 
     const HELP = '<span class="dashicons dashicons-editor-help"></span>';      
 
@@ -8,6 +8,10 @@ if (!class_exists('Genesis_Club_Tooltip')) {
 	private $tabindex;
 		
 	function __construct($labels) {
+		$this->init($labels);
+	}
+
+	function init($labels) {
 		$this->labels = is_array($labels) ? $labels : array();
 		$this->tabindex = 100;
 	}

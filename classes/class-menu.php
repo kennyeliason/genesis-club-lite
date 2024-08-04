@@ -1,9 +1,15 @@
 <?php
-class Genesis_Club_Menu {
-	
+class Genesis_Club_Menu extends Genesis_Club_Module {
+    const OPTION_NAME = 'menu';	
 	const SEARCH_STYLE = 'gc-search-menu';
 	
-	protected static $defaults  = array(
+	protected $side_menu_left = '';
+	protected $side_menu_right = '';
+	protected $below_menu = false;	
+	protected $search_text;
+	protected $is_html5;
+	
+	protected $defaults  = array(
 		'threshold' => '',
 		'icon_size' => '',
 		'icon_color' => '',
@@ -21,87 +27,79 @@ class Genesis_Club_Menu {
 		'search_padding_threshold' => '',
 		'search_button' => true,
 	);
-	protected static $side_menu_left = '';
-	protected static $side_menu_right = '';
-	protected static $below_menu = false;	
-	protected static $search_text;
-	protected static $is_html5;
+
+	function get_defaults() { return apply_filters('genesis_club_menu_defaults', $this->defaults); }
+	function get_options_name() { return self::OPTION_NAME; }
 	
-	public static function init() {
-		Genesis_Club_Options::init(array('menu' => self::$defaults));
-		self::$is_html5 = Genesis_Club_Utils::is_html5();
-		if (!is_admin()) add_action('wp',array(__CLASS__,'prepare'));
+	function init() {
+		$this->is_html5 = $this->utils->is_html5();
+		if (!is_admin()) add_action('wp',array($this,'prepare'));
 	}
 
-	public static function save_options($options) {
-   			return Genesis_Club_Options::save_options(array('menu' => $options)) ;
-	}
-
-	public static function get_options() {
-    	return Genesis_Club_Options::get_option('menu');
-    }
+	function prepare() {
+        do_action('genesis_club_menu_prepare');
 	
-	public static function get_option($option_name) {
-    	$options = self::get_options();
-    	if ($option_name && $options && array_key_exists($option_name,$options))
-        	return $options[$option_name];
-    	else
-        	return false;
-    }
-
-	public static function prepare() {
-		if (self::get_option('threshold')) {
-			if ($primary = self::get_option('primary')) 
-				add_filter('genesis_do_nav', array(__CLASS__,'add_responsive_menu'),100,3);
-			if ($secondary = self::get_option('secondary')) 
-				add_filter('genesis_do_subnav', array(__CLASS__,'add_responsive_menu'),100,3);
-			if ($header = self::get_option('header')) 
-				add_filter('wp_nav_menu', array(__CLASS__,'add_responsive_widget_menu'),100,2);
+		if ($this->get_option('threshold')) {
+			if ($primary = $this->get_option('primary')) {
+				add_filter('genesis_do_nav', array($this,'add_responsive_menu'),100,3);
+			}
+			if ($secondary = $this->get_option('secondary')) {            
+				add_filter('genesis_do_subnav', array($this,'add_responsive_menu'),100,3);
+			}
+			if ($header = $this->get_option('header')) {
+				add_filter('wp_nav_menu', array($this,'add_responsive_widget_menu'),100,2);
+			}
 			if ($primary || $secondary || $header) {				
-				add_action('wp_enqueue_scripts',array(__CLASS__,'enqueue_dashicons'));
+				add_action('wp_enqueue_scripts',array($this,'enqueue_dashicons'));
+                add_action('wp_enqueue_scripts', array($this,'enqueue_jquery'));
 				if (in_array('left',array($primary,$secondary,$header)) || in_array('right',array($primary,$secondary,$header))) {
-					add_action('wp_enqueue_scripts',array(__CLASS__,'enqueue_sidr_styles'));
-					add_action('wp_enqueue_scripts',array(__CLASS__,'enqueue_sidr_scripts'));
+					add_action('wp_enqueue_scripts',array($this,'enqueue_sidr_styles'));
+					add_action('wp_enqueue_scripts',array($this,'enqueue_sidr_scripts'));
 				}
-				add_action('wp_print_styles', array(__CLASS__, 'print_styles'));
-				add_action('wp_print_footer_scripts', array(__CLASS__, 'print_scripts'));
+				add_action('wp_print_styles', array($this, 'print_styles'));
+				add_action('wp_print_footer_scripts', array($this, 'print_scripts'));
 			}				
 		}
-	 	if (($search = self::get_option('search_menu')) && ('none' != $search)) {
-	 		add_filter('wp_nav_menu_items',  array(__CLASS__,'maybe_add_search_form'),10,2 );	
-	 		add_action('wp_enqueue_scripts', array(__CLASS__,'enqueue_search_styles'));	 		
+
+	 	if (($search = $this->get_option('search_menu')) && ('none' != $search)) {
+	 		add_filter('wp_nav_menu_items',  array($this,'maybe_add_search_form'),10,2 );	
+	 		add_action('wp_enqueue_scripts', array($this,'enqueue_search_styles'));
 	 	}
 
 	}
 
-	public static function enqueue_dashicons() {
+    function enqueue_jquery() {
+	   wp_enqueue_script('jquery');
+    }
+
+	function enqueue_dashicons() {
 		wp_enqueue_style('dashicons');
 	}
 
-	public static function enqueue_sidr_styles() {
+	function enqueue_sidr_styles() {
 		wp_enqueue_style('jquery-sidr', plugins_url('styles/jquery.sidr.dark.css',dirname(__FILE__)), array(), '1.2.1');
 	}
 
-	public static function enqueue_sidr_scripts() {
+	function enqueue_sidr_scripts() {
 		wp_enqueue_script('jquery-sidr', plugins_url('scripts/jquery.sidr.min.js',dirname(__FILE__)), array('jquery'), '1.2.1', true);
 	}
 
-	public static function enqueue_search_styles() {
+	function enqueue_search_styles() {
 		wp_enqueue_style(self::SEARCH_STYLE, plugins_url('styles/menu-search.css',dirname(__FILE__)), array(), '1.0');
 
       $placeholder_css = $css = '';
 	
-		if ($search_text_color = self::get_option('search_text_color')) {
+		if ($search_text_color = $this->get_option('search_text_color')) {
          $placeholder_css = sprintf('.genesis-nav-menu li.searchbox input::-webkit-input-placeholder{color: %1$s;} .genesis-nav-menu li.searchbox input::-moz-input-placeholder {color: %1$s;} .genesis-nav-menu li.searchbox input:-ms-input-placeholder {color: %1$s;}',$search_text_color) ."\n";
          $css .= sprintf('color: %1$s;',$search_text_color);
 		}
-		if ($search_background_color = self::get_option('search_background_color')) {
+		if ($search_background_color = $this->get_option('search_background_color')) {
          $css .= sprintf('background-color:%1$s;',$search_background_color);
 		}
-		if ($search_border_color = self::get_option('search_border_color')) {
+		if ($search_border_color = $this->get_option('search_border_color')) {
          $css .= sprintf('border-width: 2px; border-style: solid; border-color:%1$s;',$search_border_color);
 		}
-		if ($search_border_radius = self::get_option('search_border_radius')) {
+		if ($search_border_radius = $this->get_option('search_border_radius')) {
          $css .= sprintf('border-radius:%1$spx;',$search_border_radius);
 		}
       if (!empty($css)) {
@@ -109,14 +107,14 @@ class Genesis_Club_Menu {
     }
 
       $padding = '';
-      if ($top = self::check_limit(self::get_option('search_padding_top'))) {
+		if ($top = $this->check_limit($this->get_option('search_padding_top'))) {
          $padding .= sprintf('padding-top:%1$spx;',$top);
       }
-      if ($bottom = self::check_limit(self::get_option('search_padding_bottom'))) {
+      if ($bottom = $this->check_limit($this->get_option('search_padding_bottom'))) {
          $padding .= sprintf('padding-bottom:%1$spx;',$bottom);
       }
       if (!empty($padding))  {
-         if ($threshold = self::check_limit(self::get_option('search_padding_threshold'), 1600))       
+         if ($threshold = $this->check_limit($this->get_option('search_padding_threshold'), 1600))       
             $css .= sprintf ('@media only screen and (min-width: %1$spx) { .genesis-nav-menu li.searchbox {%2$s} }', $threshold, $padding) . "\n";
          else
             $css .= sprintf ('.genesis-nav-menu li.searchbox {%1$s} ', $padding) . "\n";
@@ -126,52 +124,53 @@ class Genesis_Club_Menu {
       }
 	}
 
-	public static function maybe_add_search_form($items, $args) {
-      $search_menu = self::get_option('search_menu');
+	function maybe_add_search_form($items, $args) {
+      $search_menu = $this->get_option('search_menu');
       if (($args->theme_location == $search_menu)
       || (('header' == $search_menu) && has_filter('wp_nav_menu', 'genesis_header_menu_wrap')))  {
-			 			add_filter( 'genesis_search_text',  array(__CLASS__, 'set_search_placeholder'));
-         return $items . sprintf('<li class="searchbox%2$s">%1$s</li>', get_search_form( false ), self::get_option('search_button') ? '' : ' nobutton' ) ;	         
+         add_filter( 'genesis_search_text',  array($this, 'set_search_placeholder'));
+         return $items . sprintf('<li class="searchbox%2$s">%1$s</li>', get_search_form( false ), $this->get_option('search_button') ? '' : ' nobutton' ) ;	         
       } else {
   		return $items;
 	}
 	}
 
-	public static function set_search_placeholder($content) {
-		return self::get_option('search_text');
+	function set_search_placeholder($content) {
+		return $this->get_option('search_text');
 	} 
 
-	public static function add_responsive_menu($content, $menu, $args) {
-		if (strpos($content, self::$is_html5 ? '<nav class="nav-primary' : '<div id="nav') !== FALSE) 
-			return self::maybe_prefix_responsive_menu($content, $menu, 'primary') ;
-		elseif (strpos($content, self::$is_html5 ? '<nav class="nav-secondary'  : '<div id="subnav')  !== FALSE)  
-			return self::maybe_prefix_responsive_menu($content, $menu, 'secondary') ;	
+	function add_responsive_menu($content, $menu, $args) {
+		if (strpos($content, $this->is_html5 ? '<nav class="nav-primary' : '<div id="nav') !== FALSE) 
+			return $this->maybe_prefix_responsive_menu($content, $menu, 'primary') ;
+		elseif (strpos($content, $this->is_html5 ? '<nav class="nav-secondary'  : '<div id="subnav')  !== FALSE)  
+			return $this->maybe_prefix_responsive_menu($content, $menu, 'secondary') ;	
 		else 
 			return $content;
 	}
 
-	public static function add_responsive_widget_menu($content, $args) {
+	function add_responsive_widget_menu($content, $args) {
 		if (has_filter('wp_nav_menu', 'genesis_header_menu_wrap'))
-			return self::maybe_prefix_responsive_menu($content, $content, 'header') ;		
+			return $this->maybe_prefix_responsive_menu($content, $content, 'header') ;		
 		else
 			return $content;
 	}
 
-	private static function maybe_prefix_responsive_menu($content, $menu, $option) {
-		$resp_menu  = self::get_option($option);
+	private function maybe_prefix_responsive_menu($content, $menu, $option) {
+		$resp_menu  = $this->get_option($option);
 		$hamburger = sprintf('<div class="gc-responsive-menu-icon gcm-resp-%1$s"><div class="dashicons dashicons-menu"></div></div>', $resp_menu);
-      $strip_menu = preg_replace('#\s(id|class)="[^"]+"#', '',  strip_tags($menu,'<ul><li><a><span>'));
+        $strip_menu = apply_filters( 'genesis_club_menu_stripper', preg_replace('#\s(id|class)="[^"]+"#', '', strip_tags($menu,'<ul><li><a><span>')), $menu);  //strip tags, ids and classes  
+
 		switch ($resp_menu) {
 			case 'left':
-				self::$side_menu_left .= $strip_menu; 
+				$this->side_menu_left .= $strip_menu; 
 				$prefix = $hamburger;
 				break;
 			case 'right': 
-				self::$side_menu_right .= $strip_menu; 
+				$this->side_menu_right .= $strip_menu; 
 				$prefix = $hamburger;
 				break;
 			case 'below': 
-				self::$below_menu = true;
+				$this->below_menu = true;
 				$prefix = $hamburger;
 				break;
 			default: $prefix ='';
@@ -179,19 +178,19 @@ class Genesis_Club_Menu {
 		return $prefix . $content;
 	}
 
-	private static function check_limit($item, $limit = 50) {
+	private function check_limit($item, $limit = 50) {
 		return (is_numeric($item) && (abs($item) <= $limit)) ? $item : false;
 	}
 
-	private static function check_size($item, $default) {
+	private function check_size($item, $default) {
 		return (is_numeric($item) && ($item >= 1)) ? $item : $default;		
 	}
 
-	private static function check_color($color) {
+	private function check_color($color) {
 		return preg_match('/^#?[0-9a-f]{3}(?:[0-9a-f]{3})?$/iD', $color) ? $color : '#888' ;
 	}
 
-	private static function check_unit($item) {
+	private function check_unit($item) {
 		$str = str_replace(' ','',trim($item));
 		$suffix='';
 		if (empty($str) || ('auto'==$str)
@@ -202,10 +201,10 @@ class Genesis_Club_Menu {
 			return $str. 'px';
 	}	
 
-	public static function print_styles() { 
-		$minimum_device_width = self::check_unit(self::get_option('threshold'));
-		$color = self::check_color(self::get_option('icon_color'));
-		$rsize = self::check_size(self::get_option('icon_size'),2.4);
+	function print_styles() { 
+		$minimum_device_width = $this->check_unit($this->get_option('threshold'));
+		$color = $this->check_color($this->get_option('icon_color'));
+		$rsize = $this->check_size($this->get_option('icon_size'),2.4);
 		$psize = round($rsize*10);	
     	print <<< CSS
 <style type="text/css" media="screen"> 
@@ -222,22 +221,21 @@ class Genesis_Club_Menu {
 CSS;
 		}
 	
-    public static function print_scripts () {
-		if (self::$below_menu) self::print_below_scripts();
-		if (self::$side_menu_left) self::print_side_scripts('left',self::$side_menu_left);
-		if (self::$side_menu_right)	self::print_side_scripts('right', self::$side_menu_right);
-		$icon_color = self::get_option('icon_color');
-		if (empty($icon_color)) self::print_dynamic_color_script();			
+    function print_scripts () {
+		if ($this->below_menu) $this->print_below_scripts();
+		if ($this->side_menu_left) $this->print_side_scripts('left',$this->side_menu_left);
+		if ($this->side_menu_right)	$this->print_side_scripts('right', $this->side_menu_right);
+		$icon_color = $this->get_option('icon_color');
+		if (empty($icon_color)) $this->print_dynamic_color_script();			
 	}
 
-    private static function print_side_scripts($side, $menu) {
-			$minimum_device_width = self::get_option('threshold');
-			printf('<div id="sidr-%1$s"><nav class="nav-sidr">%2$s</nav></div>', $side, $menu);
-			print <<< SCRIPT
+    private function print_side_scripts($side, $menu) {
+			$minimum_device_width = $this->get_option('threshold');
+			print <<< MENU
 <script type="text/javascript">
 //<![CDATA[
 jQuery(document).ready(function($) {
-	$(".gc-responsive-menu-icon.gcm-resp-{$side}").next().addClass('gc-responsive-menu');
+    $(".gc-responsive-menu-icon.gcm-resp-{$side}").next().addClass("gc-responsive-menu");
     $(".gc-responsive-menu-icon.gcm-resp-{$side}").sidr({
       name: "sidr-{$side}",
       source: "#sidr-{$side}",
@@ -254,17 +252,19 @@ jQuery(document).ready(function($) {
 });
 //]]>
 </script>
-	
-SCRIPT;
+<div id="sidr-{$side}"><nav class="nav-sidr">{$menu}</nav></div>	
+MENU;
     }	
 
-    private static function print_below_scripts() {
-		$minimum_device_width = self::get_option('threshold');
+    private function print_below_scripts() {
+		$minimum_device_width = $this->get_option('threshold');
 		print <<< SCRIPT
 <script type="text/javascript">
 //<![CDATA[
 jQuery(document).ready(function($){
 	$(".gc-responsive-menu-icon.gcm-resp-below").next().addClass('gc-responsive-menu');
+	$(".gc-responsive-menu").find(".responsive-menu-icon").remove();
+	$(".gc-responsive-menu").find("ul").removeClass("responsive-menu");
 	$(".gc-responsive-menu-icon.gcm-resp-below").click(function(){ $(this).next().slideToggle();});
 	$(window).resize(function(){ if(window.innerWidth > {$minimum_device_width}) { $(".gc-responsive-menu").removeAttr("style");}});
 });
@@ -274,7 +274,7 @@ jQuery(document).ready(function($){
 SCRIPT;
     }	
 
-    private static function print_dynamic_color_script() {	
+    private function print_dynamic_color_script() {	
 		print <<< SCRIPT
 <script type="text/javascript">
 //<![CDATA[
